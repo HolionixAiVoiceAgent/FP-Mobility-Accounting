@@ -1,0 +1,205 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+export interface InventoryItem {
+  id: string;
+  inventory_id: string;
+  vin: string;
+  make: string;
+  model: string;
+  year: number;
+  color?: string;
+  mileage?: number;
+  purchase_price: number;
+  expected_sale_price?: number;
+  actual_sale_price?: number;
+  status: string; // Will be one of: 'available', 'sold', 'pending_repair', 'reserved', 'in_transit'
+  location?: string;
+  tuv_expiry?: string;
+  last_service_date?: string;
+  purchase_date: string;
+  sale_date?: string;
+  images_count?: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryStats {
+  totalVehicles: number;
+  availableVehicles: number;
+  soldThisMonth: number;
+  avgDaysInStock: number;
+  totalInventoryValue: number;
+  pendingRepairs: number;
+}
+
+export const useInventory = () => {
+  return useQuery({
+    queryKey: ['inventory'],
+    queryFn: async (): Promise<InventoryItem[]> => {
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+};
+
+export const useInventoryStats = () => {
+  return useQuery({
+    queryKey: ['inventory-stats'],
+    queryFn: async (): Promise<InventoryStats> => {
+      // Get all inventory items
+      const { data: inventory, error } = await supabase
+        .from('inventory')
+        .select('*');
+
+      if (error) throw error;
+
+      const items = inventory || [];
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth();
+      const currentYear = currentDate.getFullYear();
+
+      const totalVehicles = items.length;
+      const availableVehicles = items.filter(item => item.status === 'available').length;
+      
+      // Calculate sold this month
+      const soldThisMonth = items.filter(item => {
+        if (!item.sale_date) return false;
+        const saleDate = new Date(item.sale_date);
+        return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
+      }).length;
+
+      // Calculate average days in stock
+      const daysInStock = items.map(item => {
+        const purchaseDate = new Date(item.purchase_date);
+        const endDate = item.sale_date ? new Date(item.sale_date) : currentDate;
+        return Math.floor((endDate.getTime() - purchaseDate.getTime()) / (1000 * 3600 * 24));
+      });
+      const avgDaysInStock = daysInStock.length > 0 
+        ? Math.round(daysInStock.reduce((sum, days) => sum + days, 0) / daysInStock.length)
+        : 0;
+
+      // Calculate total inventory value (available vehicles only)
+      const totalInventoryValue = items
+        .filter(item => item.status === 'available')
+        .reduce((sum, item) => sum + (item.expected_sale_price || item.purchase_price), 0);
+
+      // Count pending repairs
+      const pendingRepairs = items.filter(item => item.status === 'pending_repair').length;
+
+      return {
+        totalVehicles,
+        availableVehicles,
+        soldThisMonth,
+        avgDaysInStock,
+        totalInventoryValue,
+        pendingRepairs
+      };
+    },
+  });
+};
+
+export const useCreateInventoryItem = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (data: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {
+      const { data: result, error } = await supabase
+        .from('inventory')
+        .insert([data])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      toast({
+        title: "Success",
+        description: "Vehicle added to inventory successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add vehicle to inventory.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useUpdateInventoryItem = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, ...data }: Partial<InventoryItem> & { id: string }) => {
+      const { data: result, error } = await supabase
+        .from('inventory')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      toast({
+        title: "Success",
+        description: "Vehicle updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update vehicle.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useDeleteInventoryItem = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      toast({
+        title: "Success",
+        description: "Vehicle removed from inventory successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove vehicle from inventory.",
+        variant: "destructive",
+      });
+    },
+  });
+};
