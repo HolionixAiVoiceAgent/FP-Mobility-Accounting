@@ -35,12 +35,38 @@ serve(async (req) => {
     const tinkClientSecret = Deno.env.get('TINK_CLIENT_SECRET');
 
     if (!tinkClientId || !tinkClientSecret) {
-      throw new Error('Tink credentials not configured');
+      console.error('Tink credentials missing:', {
+        hasClientId: !!tinkClientId,
+        hasClientSecret: !!tinkClientSecret,
+      });
+      throw new Error('Tink API credentials not configured. Please add TINK_CLIENT_ID and TINK_CLIENT_SECRET to Supabase environment variables.');
     }
 
     console.log('Creating Tink user for:', user.id);
 
-    // Step 1: Create a Tink user if doesn't exist
+    // Step 1: Get access token first for verification
+    const verifyTokenResponse = await fetch('https://api.tink.com/api/v1/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        client_id: tinkClientId,
+        client_secret: tinkClientSecret,
+        grant_type: 'client_credentials',
+        scope: 'authorization:grant,user:create',
+      }),
+    });
+
+    if (!verifyTokenResponse.ok) {
+      const error = await verifyTokenResponse.text();
+      console.error('Failed to get Tink access token:', error);
+      throw new Error('Failed to authenticate with Tink');
+    }
+
+    const { access_token } = await verifyTokenResponse.json();
+
+    // Check if user already has a Tink user
     let tinkUserId: string;
     
     const { data: existingTinkUser } = await supabaseClient
@@ -50,34 +76,35 @@ serve(async (req) => {
       .maybeSingle();
 
     if (existingTinkUser) {
-      tinkUserId = existingTinkUser.tink_user_id;
-      console.log('Using existing Tink user:', tinkUserId);
-    } else {
-      // Get Tink access token with authorization:grant scope
-      console.log('Getting client access token with authorization:grant scope...');
-      const tokenResponse = await fetch('https://api.tink.com/api/v1/oauth/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          client_id: tinkClientId,
-          client_secret: tinkClientSecret,
-          grant_type: 'client_credentials',
-          scope: 'authorization:grant,user:create',
-        }),
-      });
+      // Verify the Tink user still exists on Tink's side
+      console.log('Verifying existing Tink user:', existingTinkUser.tink_user_id);
+      const verifyResponse = await fetch(
+        `https://api.tink.com/api/v1/user/${existingTinkUser.tink_user_id}`,
+        {
+          method: 'GET',
+          headers: { 
+            'Authorization': `Bearer ${access_token}` 
+          }
+        }
+      );
 
-      if (!tokenResponse.ok) {
-        const error = await tokenResponse.text();
-        console.error('Failed to get Tink access token:', error);
-        throw new Error('Failed to authenticate with Tink');
+      if (verifyResponse.ok) {
+        tinkUserId = existingTinkUser.tink_user_id;
+        console.log('Using existing Tink user:', tinkUserId);
+      } else {
+        // Tink user doesn't exist anymore, delete from DB and create new one
+        console.log('Tink user no longer exists on Tink side, creating new one');
+        await supabaseClient
+          .from('tink_users')
+          .delete()
+          .eq('user_id', user.id);
+        
+        existingTinkUser = null as any;
       }
-
-      const { access_token } = await tokenResponse.json();
-      console.log('Successfully obtained client access token');
-
-      // Create Tink user
+    }
+    
+    if (!existingTinkUser) {
+      // Create Tink user (using already obtained access_token)
       const createUserResponse = await fetch('https://api.tink.com/api/v1/user/create', {
         method: 'POST',
         headers: {
@@ -183,8 +210,17 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in tink-create-link:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('Full error details:', {
+      message: errorMessage,
+      hasClientId: !!Deno.env.get('TINK_CLIENT_ID'),
+      hasClientSecret: !!Deno.env.get('TINK_CLIENT_SECRET'),
+    });
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: errorMessage,
+        details: 'Check server logs for more information. Make sure TINK_CLIENT_ID and TINK_CLIENT_SECRET are set in Supabase Secrets.'
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,

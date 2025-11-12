@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,7 +37,9 @@ export interface InventoryStats {
 }
 
 export const useInventory = () => {
-  return useQuery({
+  const subscriptionRef = useRef<any>(null);
+
+  const query = useQuery({
     queryKey: ['inventory'],
     queryFn: async (): Promise<InventoryItem[]> => {
       const { data, error } = await supabase
@@ -47,11 +50,37 @@ export const useInventory = () => {
       if (error) throw error;
       return data || [];
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 2000,
   });
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = supabase
+      .channel('inventory_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inventory' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [query]);
+
+  return query;
 };
 
 export const useInventoryStats = () => {
-  return useQuery({
+  const subscriptionRef = useRef<any>(null);
+
+  const query = useQuery({
     queryKey: ['inventory-stats'],
     queryFn: async (): Promise<InventoryStats> => {
       // Get all inventory items
@@ -103,7 +132,31 @@ export const useInventoryStats = () => {
         pendingRepairs
       };
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 2000,
   });
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = supabase
+      .channel('inventory_stats_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inventory' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [query]);
+
+  return query;
 };
 
 export const useCreateInventoryItem = () => {

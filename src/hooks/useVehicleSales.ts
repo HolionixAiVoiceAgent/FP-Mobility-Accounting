@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface VehicleSale {
@@ -21,7 +22,9 @@ export interface VehicleSale {
 }
 
 export const useVehicleSales = () => {
-  return useQuery({
+  const subscriptionRef = useRef<any>(null);
+
+  const query = useQuery({
     queryKey: ['vehicle-sales'],
     queryFn: async (): Promise<VehicleSale[]> => {
       const { data, error } = await supabase
@@ -32,11 +35,37 @@ export const useVehicleSales = () => {
       if (error) throw error;
       return data || [];
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 2000,
   });
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = supabase
+      .channel('vehicle_sales_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vehicle_sales' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [query]);
+
+  return query;
 };
 
 export const useVehicleSalesStats = () => {
-  return useQuery({
+  const subscriptionRef = useRef<any>(null);
+
+  const query = useQuery({
     queryKey: ['vehicle-sales-stats'],
     queryFn: async () => {
       const { data: sales, error } = await supabase
@@ -68,5 +97,29 @@ export const useVehicleSalesStats = () => {
         pendingPayments
       };
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 2000,
   });
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = supabase
+      .channel('vehicle_sales_stats_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vehicle_sales' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [query]);
+
+  return query;
 };

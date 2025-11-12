@@ -26,6 +26,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { LogoUploadSection } from '@/components/LogoUploadSection';
+import { TaxIntegrationSettings } from '@/components/TaxIntegrationSettings';
 
 export default function Settings() {
   const { toast } = useToast();
@@ -207,6 +208,19 @@ export default function Settings() {
 
         {/* Logo Upload Section */}
         <LogoUploadSection currentLogoUrl={companySettings?.logo_url} />
+
+        {/* Tax Integration Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Building2 className="h-5 w-5 mr-2" />
+              Tax Integration
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TaxIntegrationSettings />
+          </CardContent>
+        </Card>
 
         {/* Security Settings */}
         <Card>

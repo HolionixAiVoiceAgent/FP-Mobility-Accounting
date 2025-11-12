@@ -14,7 +14,8 @@ import {
   Users,
   Receipt,
   Building2,
-  Settings2
+  Settings2,
+  Cloud
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useVehicleSales } from '@/hooks/useVehicleSales';
@@ -22,7 +23,10 @@ import { useExpenses } from '@/hooks/useExpenses';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useLifetimeStats } from '@/hooks/useLifetimeStats';
+import { FinancialHealthCard } from '@/components/FinancialHealthCard';
+import { AddObligationDialog } from '@/components/AddObligationDialog';
 
 const reportTemplates = [
   {
@@ -93,6 +97,9 @@ export default function Reports() {
   const { data: vehicleSales = [], isLoading: salesLoading } = useVehicleSales();
   const { data: expenses = [], isLoading: expensesLoading } = useExpenses();
   const { customers = [], loading: customersLoading } = useCustomers();
+  const { data: lifetimeStats, isLoading: statsLoading } = useLifetimeStats();
+  const [datevExporting, setDatevExporting] = useState(false);
+  const [lexofficeSyncing, setLexofficeSyncing] = useState(false);
 
   // Calculate quick stats from real data
   const quickStats = useMemo(() => {
@@ -316,11 +323,62 @@ export default function Reports() {
     }
   };
 
-  const handleDATEVExport = () => {
-    toast({
-      title: "DATEV Export",
-      description: "DATEV-compliant export started. This feature will be fully implemented soon.",
-    });
+  const handleDATEVExport = async () => {
+    setDatevExporting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("datev-export", {
+        body: {
+          startDate: null,
+          endDate: null,
+        },
+      });
+
+      if (error) throw error;
+
+      // Create blob and download
+      const blob = new Blob([data], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `datev_export_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "DATEV Export Complete",
+        description: "DATEV-compliant CSV has been downloaded.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Export Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDatevExporting(false);
+    }
+  };
+
+  const handleLexofficeSync = async () => {
+    setLexofficeSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("lexoffice-sync");
+
+      if (error) throw error;
+
+      toast({
+        title: "Lexoffice Sync Complete",
+        description: `Created ${data.invoicesCreated} invoices out of ${data.totalSales} sales.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Sync Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLexofficeSyncing(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -362,6 +420,108 @@ export default function Reports() {
             </Button>
           </div>
         </div>
+
+        {/* Lifetime Statistics */}
+        <div className="grid gap-6 md:grid-cols-4">
+          <Card className="animate-scale-in">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Lifetime Revenue</CardTitle>
+              <Euro className="h-4 w-4 text-success" />
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <div className="text-2xl font-bold text-muted-foreground">...</div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-foreground">
+                    €{lifetimeStats?.totalRevenue.toLocaleString("de-DE", { minimumFractionDigits: 2 })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Total sales</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="animate-scale-in">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Vehicles Sold</CardTitle>
+              <Car className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <div className="text-2xl font-bold text-muted-foreground">...</div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-foreground">{lifetimeStats?.vehiclesSold || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {lifetimeStats?.vehiclesPurchased || 0} purchased
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="animate-scale-in">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Customers</CardTitle>
+              <Users className="h-4 w-4 text-warning" />
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <div className="text-2xl font-bold text-muted-foreground">...</div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-foreground">{lifetimeStats?.totalCustomers || 0}</div>
+                  <p className="text-xs text-muted-foreground">Lifetime</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="animate-scale-in">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Avg Profit/Car</CardTitle>
+              <TrendingUp className="h-4 w-4 text-success" />
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <div className="text-2xl font-bold text-muted-foreground">...</div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-foreground">
+                    €{lifetimeStats?.averageProfitPerCar.toLocaleString("de-DE", { minimumFractionDigits: 2 })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Total: €{lifetimeStats?.lifetimeProfit.toLocaleString("de-DE", { minimumFractionDigits: 2 })}
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Financial Health Card */}
+        <FinancialHealthCard />
+
+        {/* Financial Obligations Management */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Financial Obligations</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Manage investor money and bank loans
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => window.location.href = '/obligations'}>
+                  View All
+                </Button>
+                <AddObligationDialog />
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
 
         {/* Quick Statistics */}
         <div className="grid gap-6 md:grid-cols-4">
@@ -522,13 +682,27 @@ export default function Reports() {
                 Tax Compliance
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground mb-4">
-                Generate DATEV-compliant exports for German tax authorities
+                Export data to DATEV or sync with Lexoffice for tax compliance
               </p>
-              <Button className="w-full" variant="outline" onClick={handleDATEVExport}>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={handleDATEVExport}
+                disabled={datevExporting}
+              >
                 <Download className="h-4 w-4 mr-2" />
-                DATEV Export
+                {datevExporting ? "Exporting..." : "DATEV Export"}
+              </Button>
+              <Button 
+                className="w-full" 
+                variant="outline" 
+                onClick={handleLexofficeSync}
+                disabled={lexofficeSyncing}
+              >
+                <Cloud className="h-4 w-4 mr-2" />
+                {lexofficeSyncing ? "Syncing..." : "Sync to Lexoffice"}
               </Button>
             </CardContent>
           </Card>

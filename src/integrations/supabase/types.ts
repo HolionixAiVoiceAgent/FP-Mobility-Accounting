@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          operation: string
+          record_id: string | null
+          table_name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          operation: string
+          record_id?: string | null
+          table_name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          operation?: string
+          record_id?: string | null
+          table_name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       bank_transactions: {
         Row: {
           account_name: string
@@ -231,6 +264,54 @@ export type Database = {
           },
         ]
       }
+      financial_obligations: {
+        Row: {
+          created_at: string | null
+          creditor_name: string
+          due_date: string | null
+          id: string
+          interest_rate: number | null
+          monthly_payment: number | null
+          notes: string | null
+          obligation_type: string
+          outstanding_balance: number
+          principal_amount: number
+          start_date: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          creditor_name: string
+          due_date?: string | null
+          id?: string
+          interest_rate?: number | null
+          monthly_payment?: number | null
+          notes?: string | null
+          obligation_type: string
+          outstanding_balance: number
+          principal_amount: number
+          start_date: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          creditor_name?: string
+          due_date?: string | null
+          id?: string
+          interest_rate?: number | null
+          monthly_payment?: number | null
+          notes?: string | null
+          obligation_type?: string
+          outstanding_balance?: number
+          principal_amount?: number
+          start_date?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       inventory: {
         Row: {
           actual_sale_price: number | null
@@ -372,6 +453,139 @@ export type Database = {
           full_name?: string
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      purchase_payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string | null
+          reference_number: string | null
+          vehicle_purchase_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          reference_number?: string | null
+          vehicle_purchase_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          reference_number?: string | null
+          vehicle_purchase_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_payments_vehicle_purchase_id_fkey"
+            columns: ["vehicle_purchase_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_records: {
+        Row: {
+          cost: number | null
+          created_at: string | null
+          description: string
+          id: string
+          inventory_id: string | null
+          invoice_url: string | null
+          mileage_at_service: number | null
+          next_service_date: string | null
+          next_service_mileage: number | null
+          service_date: string
+          service_type: string
+          updated_at: string | null
+          vendor_name: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string | null
+          description: string
+          id?: string
+          inventory_id?: string | null
+          invoice_url?: string | null
+          mileage_at_service?: number | null
+          next_service_date?: string | null
+          next_service_mileage?: number | null
+          service_date: string
+          service_type: string
+          updated_at?: string | null
+          vendor_name?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          inventory_id?: string | null
+          invoice_url?: string | null
+          mileage_at_service?: number | null
+          next_service_date?: string | null
+          next_service_mileage?: number | null
+          service_date?: string
+          service_type?: string
+          updated_at?: string | null
+          vendor_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_records_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tax_integrations: {
+        Row: {
+          api_key: string | null
+          consultant_id: string | null
+          created_at: string | null
+          id: string
+          integration_type: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          sync_frequency: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          api_key?: string | null
+          consultant_id?: string | null
+          created_at?: string | null
+          id?: string
+          integration_type: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          sync_frequency?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          api_key?: string | null
+          consultant_id?: string | null
+          created_at?: string | null
+          id?: string
+          integration_type?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          sync_frequency?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -519,6 +733,74 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "vehicle_images_inventory_id_fkey"
+            columns: ["inventory_id"]
+            isOneToOne: false
+            referencedRelation: "inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_purchases: {
+        Row: {
+          amount_paid: number | null
+          created_at: string | null
+          id: string
+          inventory_id: string | null
+          notes: string | null
+          outstanding_balance: number
+          payment_due_date: string
+          payment_method: string | null
+          payment_status: string | null
+          payment_terms_days: number | null
+          purchase_date: string
+          purchase_price: number
+          seller_address: string | null
+          seller_contact: string | null
+          seller_name: string
+          seller_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount_paid?: number | null
+          created_at?: string | null
+          id?: string
+          inventory_id?: string | null
+          notes?: string | null
+          outstanding_balance: number
+          payment_due_date: string
+          payment_method?: string | null
+          payment_status?: string | null
+          payment_terms_days?: number | null
+          purchase_date?: string
+          purchase_price: number
+          seller_address?: string | null
+          seller_contact?: string | null
+          seller_name: string
+          seller_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount_paid?: number | null
+          created_at?: string | null
+          id?: string
+          inventory_id?: string | null
+          notes?: string | null
+          outstanding_balance?: number
+          payment_due_date?: string
+          payment_method?: string | null
+          payment_status?: string | null
+          payment_terms_days?: number | null
+          purchase_date?: string
+          purchase_price?: number
+          seller_address?: string | null
+          seller_contact?: string | null
+          seller_name?: string
+          seller_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_purchases_inventory_id_fkey"
             columns: ["inventory_id"]
             isOneToOne: false
             referencedRelation: "inventory"

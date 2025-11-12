@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Building2, LayoutDashboard, Car, Receipt, Users, FileText, Settings, CreditCard, Package, LogOut } from 'lucide-react';
+import { Building2, LayoutDashboard, Car, Receipt, Users, FileText, Settings, CreditCard, Package, LogOut, ShoppingCart } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Inventory', href: '/inventory', icon: Car },
   { name: 'Vehicle Sales', href: '/sales', icon: Car },
+  { name: 'Purchases Payable', href: '/purchases', icon: ShoppingCart },
   { name: 'Customers & CRM', href: '/customers', icon: Users },
   { name: 'Expenses', href: '/expenses', icon: Receipt },
   { name: 'Banking', href: '/bank', icon: CreditCard },

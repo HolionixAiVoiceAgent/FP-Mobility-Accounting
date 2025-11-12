@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -35,6 +35,8 @@ export function useCustomers() {
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const subscriptionRef = useRef<any>(null);
+  const refetchIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchCustomers = async () => {
     try {
@@ -155,6 +157,34 @@ export function useCustomers() {
 
   useEffect(() => {
     fetchCustomers();
+
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('customers_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'customers' },
+        () => {
+          fetchCustomers();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    // Also set up polling every 5 seconds for real-time updates
+    refetchIntervalRef.current = setInterval(() => {
+      fetchCustomers();
+    }, 5000);
+
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+      }
+      if (refetchIntervalRef.current) {
+        clearInterval(refetchIntervalRef.current);
+      }
+    };
   }, []);
 
   return {

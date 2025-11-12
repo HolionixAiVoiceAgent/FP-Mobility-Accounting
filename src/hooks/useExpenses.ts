@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Expense {
@@ -17,7 +18,9 @@ export interface Expense {
 }
 
 export const useExpenses = () => {
-  return useQuery({
+  const subscriptionRef = useRef<any>(null);
+
+  const query = useQuery({
     queryKey: ['expenses'],
     queryFn: async (): Promise<Expense[]> => {
       const { data, error } = await supabase
@@ -28,11 +31,37 @@ export const useExpenses = () => {
       if (error) throw error;
       return data || [];
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 2000,
   });
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = supabase
+      .channel('expenses_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'expenses' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [query]);
+
+  return query;
 };
 
 export const useExpenseStats = () => {
-  return useQuery({
+  const subscriptionRef = useRef<any>(null);
+
+  const query = useQuery({
     queryKey: ['expense-stats'],
     queryFn: async () => {
       const { data: expenses, error } = await supabase
@@ -81,5 +110,29 @@ export const useExpenseStats = () => {
         categoryBreakdown
       };
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 2000,
   });
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = supabase
+      .channel('expense_stats_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'expenses' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [query]);
+
+  return query;
 };

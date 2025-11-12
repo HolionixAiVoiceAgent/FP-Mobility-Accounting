@@ -11,11 +11,26 @@ import Expenses from "./pages/Expenses";
 import BankIntegration from "./pages/BankIntegration";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import FinancialObligations from "./pages/FinancialObligations";
+import VehiclePurchases from "./pages/VehiclePurchases";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+// Optimized QueryClient configuration for real-time data updates
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Reduce staleTime for dashboard and metrics to enable frequent refetches
+      staleTime: 5000, // 5 seconds - data is considered stale after this
+      gcTime: 10 * 60 * 1000, // 10 minutes - garbage collection time
+      refetchInterval: 5000, // Actively refetch every 5 seconds for dashboard
+      refetchOnWindowFocus: true, // Refetch when user returns to window
+      refetchOnReconnect: true, // Refetch when connection is restored
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -33,6 +48,8 @@ const App = () => (
           <Route path="/bank" element={<ProtectedRoute><BankIntegration /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/obligations" element={<ProtectedRoute><FinancialObligations /></ProtectedRoute>} />
+          <Route path="/purchases" element={<ProtectedRoute><VehiclePurchases /></ProtectedRoute>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
