@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Building2, LayoutDashboard, Car, Receipt, Users, FileText, Settings, CreditCard, Package, LogOut, ShoppingCart } from 'lucide-react';
+import { Building2, LayoutDashboard, Car, Receipt, Users, FileText, Settings, CreditCard, Package, LogOut, ShoppingCart, Briefcase } from 'lucide-react';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ const navigation = [
   { name: 'Customers & CRM', href: '/customers', icon: Users },
   { name: 'Expenses', href: '/expenses', icon: Receipt },
   { name: 'Banking', href: '/bank', icon: CreditCard },
+  { name: 'HRM', href: '/hrm', icon: Briefcase },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

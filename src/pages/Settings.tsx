@@ -19,7 +19,8 @@ import {
   Mail,
   Smartphone,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Users
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -27,6 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { LogoUploadSection } from '@/components/LogoUploadSection';
 import { TaxIntegrationSettings } from '@/components/TaxIntegrationSettings';
+import { EmployeeManagement } from '@/components/EmployeeManagement';
 
 export default function Settings() {
   const { toast } = useToast();
@@ -68,19 +70,21 @@ export default function Settings() {
     address: '',
     phone: '',
     email: '',
-    bank_account: ''
+    bank_account: '',
+    monthly_work_hours: '160',
   });
 
   useEffect(() => {
     if (companySettings) {
       setCompanyData({
-        company_name: companySettings.company_name || '',
-        tax_id: companySettings.tax_id || '',
-        address: companySettings.address || '',
-        phone: companySettings.phone || '',
-        email: companySettings.email || '',
-        bank_account: companySettings.bank_account || ''
-      });
+          company_name: companySettings.company_name || '',
+          tax_id: companySettings.tax_id || '',
+          address: companySettings.address || '',
+          phone: companySettings.phone || '',
+          email: companySettings.email || '',
+          bank_account: companySettings.bank_account || '',
+          monthly_work_hours: (companySettings as any).monthly_work_hours?.toString() || '160'
+        });
     }
   }, [companySettings]);
 
@@ -112,7 +116,13 @@ export default function Settings() {
   });
 
   const handleSaveCompanyInfo = () => {
-    updateSettingsMutation.mutate(companyData);
+    // Ensure monthly_work_hours is stored as integer in DB
+    const updates: any = { ...companyData };
+    if (updates.monthly_work_hours !== undefined) {
+      const parsed = parseInt(updates.monthly_work_hours as any, 10);
+      updates.monthly_work_hours = Number.isFinite(parsed) ? parsed : 160;
+    }
+    updateSettingsMutation.mutate(updates);
   };
 
   return (
@@ -195,6 +205,16 @@ export default function Settings() {
                       id="bank-account" 
                       value={companyData.bank_account}
                       onChange={(e) => setCompanyData({...companyData, bank_account: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monthly-work-hours">Monthly Working Hours</Label>
+                    <Input
+                      id="monthly-work-hours"
+                      type="number"
+                      value={companyData.monthly_work_hours}
+                      onChange={(e) => setCompanyData({ ...companyData, monthly_work_hours: e.target.value })}
+                      placeholder="160"
                     />
                   </div>
                 </div>
@@ -433,6 +453,8 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Employees & HR moved to HRM module */}
 
         {/* System Information */}
         <Card>

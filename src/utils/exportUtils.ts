@@ -60,6 +60,16 @@ export const exportExpensesToCSV = async (expenses: any[]) => {
     .from('inventory')
     .select('id, make, model, year, vin');
 
+  // Fetch employees to map employee_id to name (optional)
+  // employees table may not be present in the typed supabase client; use any to avoid type errors
+  const { data: employees } = await (supabase as any)
+    .from('employees')
+    .select('id, full_name');
+
+  const employeeMap = new Map(
+    employees?.map((e: any) => [e.id, e.full_name]) || []
+  );
+
   const vehicleMap = new Map(
     vehicles?.map(v => [v.id, `${v.year} ${v.make} ${v.model} (VIN: ${v.vin})`]) || []
   );
@@ -72,6 +82,8 @@ export const exportExpensesToCSV = async (expenses: any[]) => {
     Vehicle: expense.vehicle_id ? (vehicleMap.get(expense.vehicle_id) || 'N/A') : 'N/A',
     Category: expense.category,
     Vendor: expense.vendor || 'N/A',
+    'Payment Type': expense.payment_type || 'account',
+    Employee: expense.employee_id ? (employeeMap.get(expense.employee_id) || expense.employee_id) : '',
     Receipt: expense.receipt_url || 'No receipt',
     'Tax Deductible': expense.tax_deductible ? 'Yes' : 'No'
   }));

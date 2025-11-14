@@ -13,6 +13,8 @@ export interface Expense {
   tax_deductible: boolean | null;
   receipt_url: string | null;
   vehicle_id: string | null;
+  payment_type?: 'cash' | 'account' | null;
+  employee_id?: string | null;
   created_at: string;
   updated_at: string;
 }

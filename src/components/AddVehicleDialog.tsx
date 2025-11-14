@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import QrReader from 'react-qr-barcode-scanner';
+import { VehicleImageUpload } from './VehicleImageUpload';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 
 export function AddVehicleDialog() {
   const [open, setOpen] = useState(false);
+  const [showVinScanner, setShowVinScanner] = useState(false);
+  const [tempInventoryId, setTempInventoryId] = useState('');
   const [formData, setFormData] = useState({
     inventory_id: '',
     vin: '',
@@ -91,7 +95,32 @@ export function AddVehicleDialog() {
         <DialogHeader>
           <DialogTitle>Add New Vehicle</DialogTitle>
         </DialogHeader>
-        
+
+        {/* VIN Scanner Modal */}
+        {showVinScanner && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full flex flex-col items-center">
+              <h2 className="text-lg font-semibold mb-2">Scan VIN Barcode</h2>
+              <div className="w-full h-64">
+                <QrReader
+                  onUpdate={(result, error) => {
+                    const code = (result as any)?.text;
+                    if (code) {
+                      setFormData(prev => ({ ...prev, vin: code }));
+                      setShowVinScanner(false);
+                    }
+                  }}
+                  width={"100%"}
+                  height={256}
+                />
+              </div>
+              <Button className="mt-4" variant="outline" onClick={() => setShowVinScanner(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -106,13 +135,18 @@ export function AddVehicleDialog() {
             </div>
             <div>
               <Label htmlFor="vin">VIN *</Label>
-              <Input
-                id="vin"
-                value={formData.vin}
-                onChange={(e) => setFormData(prev => ({...prev, vin: e.target.value}))}
-                placeholder="WBA3A5G50FNS12345"
-                required
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="vin"
+                  value={formData.vin}
+                  onChange={(e) => setFormData(prev => ({...prev, vin: e.target.value}))}
+                  placeholder="WBA3A5G50FNS12345"
+                  required
+                />
+                <Button type="button" variant="secondary" onClick={() => setShowVinScanner(true)}>
+                  Scan
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -265,6 +299,16 @@ export function AddVehicleDialog() {
               rows={3}
             />
           </div>
+
+          {/* ...existing form fields... */}
+
+          {/* Vehicle Photo Upload Section */}
+          {formData.inventory_id && (
+            <div className="mt-6">
+              <h3 className="font-semibold mb-2">Vehicle Photos</h3>
+              <VehicleImageUpload inventoryId={formData.inventory_id} />
+            </div>
+          )}
 
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

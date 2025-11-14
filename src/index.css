@@ -111,6 +111,9 @@ All colors MUST be HSL.
   }
 
   body {
+    /* Fallbacks in case CSS variables or Tailwind utilities fail to load */
+    background-color: #ffffff;
+    color: #111111;
     @apply bg-background text-foreground;
   }
 }

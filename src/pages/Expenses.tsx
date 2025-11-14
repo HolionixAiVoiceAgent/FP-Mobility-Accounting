@@ -18,10 +18,14 @@ import {
   FileText,
   Settings2
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useExpenses, useExpenseStats } from '@/hooks/useExpenses';
 import { AddExpenseDialog } from '@/components/AddExpenseDialog';
+import { CashSummaryCard } from '@/components/CashSummaryCard';
+import { AddCashAdvanceDialog } from '@/components/AddCashAdvanceDialog';
+import { CashAdvancesList } from '@/components/CashAdvancesList';
+import { supabase } from '@/integrations/supabase/client';
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { ImportDialog } from '@/components/ImportDialog';
 import { BulkDeleteDialog } from '@/components/BulkDeleteDialog';
@@ -108,6 +112,7 @@ export default function Expenses() {
   const { toast } = useToast();
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: stats } = useExpenseStats();
+  const [employeesMap, setEmployeesMap] = useState<Record<string, string>>({});
 
   const handleExportExpenses = async () => {
     if (expenses.length === 0) {
@@ -124,6 +129,22 @@ export default function Expenses() {
       description: "Expenses data has been exported to CSV.",
     });
   };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await (supabase as any).from('employees').select('id, full_name');
+        if (!mounted || !data) return;
+        const map: Record<string, string> = {};
+        data.forEach((e: any) => { map[e.id] = e.full_name; });
+        setEmployeesMap(map);
+      } catch (e) {
+        // employees table may not exist in some deployments
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -208,6 +229,19 @@ export default function Expenses() {
               <p className="text-xs text-muted-foreground">Awaiting payment</p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Employee Cash Summary and Advances */}
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <CashSummaryCard />
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-end space-x-2">
+              <AddCashAdvanceDialog />
+            </div>
+            <CashAdvancesList />
+          </div>
         </div>
 
         {/* Expense Categories */}
@@ -350,6 +384,13 @@ export default function Expenses() {
                       <div>
                         <span className="text-muted-foreground">Vendor:</span>
                         <span className="ml-2 font-medium">{expense.vendor || 'N/A'}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Payment:</span>
+                        <span className="ml-2 font-medium">{expense.payment_type ? expense.payment_type.charAt(0).toUpperCase() + expense.payment_type.slice(1) : 'Account'}</span>
+                        {expense.payment_type === 'cash' && expense.employee_id ? (
+                          <div className="text-xs text-muted-foreground">Handled by: <span className="ml-1 font-medium">{employeesMap[expense.employee_id] || expense.employee_id}</span></div>
+                        ) : null}
                       </div>
                       <div className="flex space-x-2">
                         <DeleteDialog 

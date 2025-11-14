@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,31 +23,43 @@ export function AddExpenseDialog() {
     date: new Date().toISOString().split('T')[0],
     tax_deductible: true,
     vehicle_id: '',
-    receipt_url: null as string | null
+    receipt_url: null as string | null,
+    payment_type: 'account' as 'account' | 'cash',
+    employee_id: ''
   });
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: vehicles = [] } = useInventory();
+  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string }>>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
+      const expenseData = {
+        expense_id: formData.expense_id || `EXP-${Date.now()}`,
+        category: formData.category,
+        description: formData.description,
+        amount: parseFloat(formData.amount),
+        vendor: formData.vendor || null,
+        date: formData.date,
+        tax_deductible: formData.tax_deductible,
+        vehicle_id: formData.vehicle_id && formData.vehicle_id !== 'none' ? formData.vehicle_id : null,
+        receipt_url: formData.receipt_url || null,
+        payment_type: formData.payment_type,
+        employee_id: formData.payment_type === 'cash' && formData.employee_id && formData.employee_id !== '__none__' ? formData.employee_id : null
+      };
+
+      console.log('Submitting expense:', expenseData);
+
       const { error } = await supabase
         .from('expenses')
-        .insert([{
-          expense_id: formData.expense_id || `EXP-${Date.now()}`,
-          category: formData.category,
-          description: formData.description,
-          amount: parseFloat(formData.amount),
-          vendor: formData.vendor || null,
-          date: formData.date,
-          tax_deductible: formData.tax_deductible,
-          vehicle_id: formData.vehicle_id || null,
-          receipt_url: formData.receipt_url
-        }]);
+        .insert([expenseData]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
@@ -66,7 +78,9 @@ export function AddExpenseDialog() {
         date: new Date().toISOString().split('T')[0],
         tax_deductible: true,
         vehicle_id: '',
-        receipt_url: null
+        receipt_url: null,
+        payment_type: 'account',
+        employee_id: ''
       });
       setOpen(false);
     } catch (error) {
@@ -77,6 +91,21 @@ export function AddExpenseDialog() {
       });
     }
   };
+
+  // Fetch employees for cash assignment (if employees table exists)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // cast to any because the generated supabase client may not include an employees table in types
+        const { data } = await (supabase as any).from('employees').select('id,full_name');
+        if (mounted && data) setEmployees(data as any);
+      } catch (e) {
+        // ignore - employees table may not exist yet in some deployments
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -143,6 +172,35 @@ export function AddExpenseDialog() {
                 value={formData.date}
                 onChange={(e) => setFormData({...formData, date: e.target.value})}
               />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="payment_type">Payment Type</Label>
+              <Select value={formData.payment_type} onValueChange={(value) => setFormData({...formData, payment_type: value as 'account' | 'cash'})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="account">Account / Bank</SelectItem>
+                  <SelectItem value="cash">Cash (Employee Advance)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="employee">Employee (when Cash)</Label>
+              <Select value={formData.employee_id} onValueChange={(value) => setFormData({...formData, employee_id: value === '__none__' ? '' : value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select employee (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>{emp.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

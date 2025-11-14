@@ -13,20 +13,23 @@ export function DashboardCharts({ salesData, revenueBySource }: DashboardChartsP
   const hasSalesData = salesData && salesData.length > 0;
   const hasRevenueData = revenueBySource && revenueBySource.some(item => item.value > 0);
 
+  // Responsive chart heights based on screen size
+  const chartHeight = typeof window !== 'undefined' && window.innerWidth < 768 ? 250 : 300;
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 mt-4 sm:mt-6">
       {/* Revenue vs Expenses Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Revenue vs Expenses</CardTitle>
+          <CardTitle className="text-sm sm:text-base">Revenue vs Expenses</CardTitle>
         </CardHeader>
         <CardContent>
           {hasSalesData ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <LineChart data={salesData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value) => `€${Number(value).toLocaleString()}`} />
                 <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} name="Revenue" />
@@ -34,8 +37,8 @@ export function DashboardCharts({ salesData, revenueBySource }: DashboardChartsP
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <p>No sales data available yet</p>
+            <div className={`h-[${chartHeight}px] flex items-center justify-center text-muted-foreground`}>
+              <p className="text-sm">No sales data available yet</p>
             </div>
           )}
         </CardContent>
@@ -44,23 +47,23 @@ export function DashboardCharts({ salesData, revenueBySource }: DashboardChartsP
       {/* Profit by Month Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Monthly Profit</CardTitle>
+          <CardTitle className="text-sm sm:text-base">Monthly Profit</CardTitle>
         </CardHeader>
         <CardContent>
           {hasSalesData ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart data={salesData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value) => `€${Number(value).toLocaleString()}`} />
                 <Legend />
                 <Bar dataKey="profit" fill="hsl(var(--primary))" name="Profit" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <p>No profit data available yet</p>
+            <div className={`h-[${chartHeight}px] flex items-center justify-center text-muted-foreground`}>
+              <p className="text-sm">No profit data available yet</p>
             </div>
           )}
         </CardContent>
@@ -69,11 +72,11 @@ export function DashboardCharts({ salesData, revenueBySource }: DashboardChartsP
       {/* Revenue by Source Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Revenue by Source</CardTitle>
+          <CardTitle className="text-sm sm:text-base">Revenue by Source</CardTitle>
         </CardHeader>
         <CardContent>
           {hasRevenueData ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <PieChart>
                 <Pie
                   data={revenueBySource}
@@ -81,7 +84,7 @@ export function DashboardCharts({ salesData, revenueBySource }: DashboardChartsP
                   cy="50%"
                   labelLine={false}
                   label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
+                  outerRadius={chartHeight < 300 ? 60 : 80}
                   fill="hsl(var(--primary))"
                   dataKey="value"
                 >
@@ -93,8 +96,8 @@ export function DashboardCharts({ salesData, revenueBySource }: DashboardChartsP
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <p>No revenue data available yet</p>
+            <div className={`h-[${chartHeight}px] flex items-center justify-center text-muted-foreground`}>
+              <p className="text-sm">No revenue data available yet</p>
             </div>
           )}
         </CardContent>
@@ -103,23 +106,23 @@ export function DashboardCharts({ salesData, revenueBySource }: DashboardChartsP
       {/* Vehicles Sold Trend */}
       <Card>
         <CardHeader>
-          <CardTitle>Vehicles Sold Trend</CardTitle>
+          <CardTitle className="text-sm sm:text-base">Vehicles Sold Trend</CardTitle>
         </CardHeader>
         <CardContent>
           {hasSalesData && salesData.some(item => item.vehiclesSold) ? (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart data={salesData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Legend />
                 <Bar dataKey="vehiclesSold" fill="hsl(var(--secondary))" name="Vehicles Sold" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              <p>No vehicle sales data available yet</p>
+            <div className={`h-[${chartHeight}px] flex items-center justify-center text-muted-foreground`}>
+              <p className="text-sm">No vehicle sales data available yet</p>
             </div>
           )}
         </CardContent>
