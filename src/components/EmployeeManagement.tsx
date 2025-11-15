@@ -166,6 +166,14 @@ export function EmployeeManagement() {
     if (parseBase != null) commonPayload.base_salary = parseBase;
     if (computedHourly != null) commonPayload.hourly_rate = computedHourly;
 
+    console.log('[EmployeeManagement] Attempting save with payload:', {
+      isUpdate: !!employeeData.id,
+      employeeId: employeeData.id,
+      payload: commonPayload,
+      computedHourly,
+      monthlyHours
+    });
+
     // helper to attempt a request and optionally retry without problematic columns
     const attemptUpsert = async (operation: 'insert' | 'update', payload: Record<string, any>, id?: string) => {
       try {
@@ -174,7 +182,11 @@ export function EmployeeManagement() {
             .from('employees')
             .update(payload)
             .eq('id', id);
-          if (error) throw error;
+          if (error) {
+            console.error('[EmployeeManagement] Update error:', { error, payload, id });
+            throw error;
+          }
+          console.log('[EmployeeManagement] Update successful');
           return;
         }
 
@@ -182,13 +194,24 @@ export function EmployeeManagement() {
           .from('employees')
           .insert([payload]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('[EmployeeManagement] Insert error:', { error, payload });
+          throw error;
+        }
+        console.log('[EmployeeManagement] Insert successful');
         return;
       } catch (err: any) {
-        // If error complains about unknown column, retry without base_salary/hourly_rate
+        // If error complains about unknown column or schema cache, retry without salary columns
         const msg = err?.message || err?.error?.message || '';
-        const unknownColumn = /column "(hourly_rate|base_salary)" does not exist/i.test(msg);
+        console.warn('[EmployeeManagement] Upsert error, checking for column mismatch:', msg);
+        
+        // Check for multiple error patterns: "does not exist", "schema cache", "Could not find"
+        const unknownColumn = /column "(hourly_rate|base_salary)" does not exist|Could not find the '(hourly_rate|base_salary)'|schema cache/i.test(msg);
+        
         if (unknownColumn) {
+          console.log('[EmployeeManagement] Schema mismatch detected - retrying without base_salary/hourly_rate columns');
+          console.log('[EmployeeManagement] NOTE: Database migration not applied. Run: supabase db push');
+          
           const safePayload = { ...payload };
           delete safePayload.hourly_rate;
           delete safePayload.base_salary;
@@ -198,14 +221,22 @@ export function EmployeeManagement() {
               .from('employees')
               .update(safePayload)
               .eq('id', id);
-            if (retryErr) throw retryErr;
+            if (retryErr) {
+              console.error('[EmployeeManagement] Retry update error:', retryErr);
+              throw retryErr;
+            }
+            console.log('[EmployeeManagement] Retry update successful (without salary fields)');
             return;
           }
 
           const { error: retryErr } = await (supabase as any)
             .from('employees')
             .insert([safePayload]);
-          if (retryErr) throw retryErr;
+          if (retryErr) {
+            console.error('[EmployeeManagement] Retry insert error:', retryErr);
+            throw retryErr;
+          }
+          console.log('[EmployeeManagement] Retry insert successful (without salary fields)');
           return;
         }
 
@@ -231,15 +262,47 @@ export function EmployeeManagement() {
       setAddDialogOpen(false);
       setFormErrors({});
     },
-    onError: (error) => {
-      logError(error, { operation: 'saveEmployee', context: 'EmployeeManagement' });
-      // Surface error in the form if possible
-      const msg = error instanceof Error ? error.message : 'Failed to save employee';
-      setFormErrors({ general: msg });
+    onError: (error: any) => {
+      // Extract detailed error information
+      const errorMsg = error?.message || error?.error?.message || error?.details || 'Failed to save employee';
+      const errorCode = error?.code || error?.error?.code || '';
+      const hint = error?.hint || error?.error?.hint || '';
+      
+      // Log comprehensive error details
+      logError(error, { 
+        operation: 'saveEmployee', 
+        context: 'EmployeeManagement',
+        errorMsg,
+        errorCode,
+        hint,
+        fullError: JSON.stringify(error)
+      });
+      
+      // Build user-friendly message
+      let displayMsg = errorMsg;
+      if (errorCode === '42501') {
+        displayMsg = 'Permission denied. Only admins, managers, or HR managers can add employees.';
+      } else if (errorCode === '42P01') {
+        displayMsg = 'Database schema error. Please contact support.';
+      } else if (errorMsg.includes('schema cache') || errorMsg.includes('Could not find')) {
+        displayMsg = 'Database schema not updated. Please run: supabase db push';
+      } else if (hint) {
+        displayMsg = `${errorMsg} (${hint})`;
+      }
+      
+      setFormErrors({ general: displayMsg });
       toast({
         title: 'Error',
-        description: msg,
+        description: displayMsg,
         variant: 'destructive',
+      });
+      
+      // Also log to browser console for debugging
+      console.error('[EmployeeManagement] Save error:', { 
+        errorMsg, 
+        errorCode, 
+        hint,
+        fullError: error 
       });
     },
   });
