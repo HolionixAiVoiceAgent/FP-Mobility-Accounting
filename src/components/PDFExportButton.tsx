@@ -43,7 +43,7 @@ export function PDFExportButton({
       onClick={handleExport}
     >
       <FileSpreadsheet className="h-4 w-4" />
-      Export Excel
+      Export Report
     </Button>
   );
 }
