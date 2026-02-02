@@ -264,6 +264,71 @@ export type Database = {
           },
         ]
       }
+      employees: {
+        Row: {
+          id: string
+          user_id: string | null
+          role: string
+          first_name: string
+          last_name: string
+          email: string
+          phone: string | null
+          hire_date: string
+          position: string | null
+          department: string | null
+          base_salary: number | null
+          commission_rate: number | null
+          is_active: boolean
+          manager_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          role: string
+          first_name: string
+          last_name: string
+          email: string
+          phone?: string | null
+          hire_date?: string
+          position?: string | null
+          department?: string | null
+          base_salary?: number | null
+          commission_rate?: number | null
+          is_active?: boolean
+          manager_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          role?: string
+          first_name?: string
+          last_name?: string
+          email?: string
+          phone?: string | null
+          hire_date?: string
+          position?: string | null
+          department?: string | null
+          base_salary?: number | null
+          commission_rate?: number | null
+          is_active?: boolean
+          manager_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_obligations: {
         Row: {
           created_at: string | null
@@ -682,19 +747,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          role: Database["public"]["Enums"]["app_role"]
+          role: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
+          role: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: string
           user_id?: string
         }
         Relationships: []
@@ -887,7 +952,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "employee"
+      app_role: "owner" | "manager" | "sales_manager" | "salesperson" | "accountant" | "hr_manager" | "inventory_manager" | "service_advisor" | "admin" | "employee"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1015,7 +1080,261 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "employee"],
+      app_role: ["owner", "manager", "sales_manager", "salesperson", "accountant", "hr_manager", "inventory_manager", "service_advisor", "admin", "employee"],
     },
   },
 } as const
+
+// ============================================================================
+// ADDITIONAL TABLES FROM MIGRATIONS
+// ============================================================================
+
+export type EmployeeAttendance = {
+  id: string
+  employee_id: string
+  date: string
+  check_in_time: string
+  check_out_time: string | null
+  status: 'present' | 'absent' | 'leave'
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EmployeeLeaves = {
+  id: string
+  employee_id: string
+  leave_type: 'sick' | 'vacation' | 'personal' | 'unpaid'
+  start_date: string
+  end_date: string
+  reason: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  approved_by: string | null
+  approval_date: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type SalesPipeline = {
+  id: string
+  dealership_id: string | null
+  vehicle_id: string | null
+  customer_id: string | null
+  salesperson_id: string | null
+  stage: string
+  lead_source: string | null
+  deal_value: number | null
+  probability_percentage: number | null
+  expected_close_date: string | null
+  notes: string | null
+  lost_reason: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type Leads = {
+  id: string
+  first_name: string
+  last_name: string
+  email: string | null
+  phone: string | null
+  lead_source: string | null
+  status: string
+  vehicle_make: string | null
+  vehicle_model: string | null
+  vehicle_year_from: number | null
+  vehicle_year_to: number | null
+  budget_min: number | null
+  budget_max: number | null
+  assigned_to: string | null
+  notes: string | null
+  last_contact_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EmployeePerformance = {
+  id: string
+  employee_id: string
+  metric_date: string
+  metric_type: string
+  vehicles_sold: number
+  total_sales_value: number
+  commission_earned: number
+  leads_generated: number
+  leads_contacted: number
+  conversion_rate: number | null
+  test_drives: number
+  customer_satisfaction_rating: number | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type Commissions = {
+  id: string
+  employee_id: string
+  vehicle_sale_id: string | null
+  commission_rate: number
+  commission_base_amount: number
+  commission_amount: number
+  sale_date: string
+  payment_status: string
+  payment_date: string | null
+  payment_method: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CustomerFinancing = {
+  id: string
+  vehicle_sale_id: string
+  customer_id: string | null
+  financing_type: string
+  total_amount: number
+  down_payment: number
+  loan_amount: number | null
+  monthly_payment: number | null
+  interest_rate: number
+  interest_type: string | null
+  loan_term_months: number | null
+  start_date: string
+  end_date: string | null
+  status: string
+  payments_made: number
+  next_payment_date: string | null
+  last_payment_date: string | null
+  finance_company: string | null
+  contract_number: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type FinancingPayments = {
+  id: string
+  financing_id: string
+  payment_amount: number
+  payment_date: string
+  payment_method: string | null
+  reference_id: string | null
+  notes: string | null
+  created_at: string
+}
+
+export type TestDrives = {
+  id: string
+  vehicle_id: string
+  customer_id: string
+  salesperson_id: string | null
+  scheduled_date: string
+  actual_start_date: string | null
+  actual_end_date: string | null
+  status: string
+  odometer_before: number | null
+  odometer_after: number | null
+  result: string | null
+  customer_notes: string | null
+  salesperson_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type MarketPrices = {
+  id: string
+  make: string
+  model: string
+  year: number
+  avg_price: number | null
+  min_price: number | null
+  max_price: number | null
+  median_price: number | null
+  inventory_count: number | null
+  days_on_market: number | null
+  source: string | null
+  condition: string | null
+  mileage_km: number | null
+  fuel_type: string | null
+  transmission: string | null
+  last_updated: string
+  created_at: string
+}
+
+export type QRCodes = {
+  id: string
+  vehicle_id: string
+  qr_code_url: string | null
+  qr_code_data: Record<string, unknown> | null
+  qr_image_base64: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type VehicleTracking = {
+  id: string
+  vehicle_id: string
+  current_status: string
+  location_lot: string | null
+  location_building: string | null
+  received_date: string
+  expected_sale_date: string | null
+  last_status_change: string
+  days_in_stock: number
+  marketing_start_date: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type AuditLogsEnhanced = {
+  id: string
+  user_id: string | null
+  employee_id: string | null
+  action: string
+  table_name: string
+  record_id: string | null
+  old_values: Record<string, unknown> | null
+  new_values: Record<string, unknown> | null
+  change_reason: string | null
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+export type CommunicationHistory = {
+  id: string
+  customer_id: string
+  employee_id: string | null
+  channel: string
+  message: string | null
+  message_direction: string | null
+  status: string
+  external_id: string | null
+  subject: string | null
+  attachments: unknown
+  created_at: string
+}
+
+export type RolePermissions = {
+  id: string
+  role: string
+  resource: string
+  action: string
+  granted: boolean | null
+  conditions: Record<string, unknown> | null
+  created_at: string
+}
+
+export type CashAdvances = {
+  id: string
+  employee_id: string
+  amount: number
+  purpose: string | null
+  status: string
+  requested_date: string
+  approved_date: string | null
+  repayment_date: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}

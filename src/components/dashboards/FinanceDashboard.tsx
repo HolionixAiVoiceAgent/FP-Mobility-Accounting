@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useExpenseStats } from '@/hooks/useExpenses';
-import { useVehicleSalesStats } from '@/hooks/useVehicleSales';
+import { useExpenseStats, useExpenses } from '@/hooks/useExpenses';
+import { useVehicleSalesStats, useVehicleSales } from '@/hooks/useVehicleSales';
 import { useTinkBalance } from '@/hooks/useTinkBalance';
 import { useFinancialObligations } from '@/hooks/useFinancialObligations';
+import { PDFExportButton } from '../PDFExportButton';
 import { Euro, TrendingDown, PieChart, AlertTriangle, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { DashboardCharts } from '../DashboardCharts';
@@ -10,25 +11,54 @@ import { DashboardCharts } from '../DashboardCharts';
 export function FinanceDashboard() {
   const { data: expenseStats, isLoading: expensesLoading } = useExpenseStats();
   const { data: salesStats } = useVehicleSalesStats();
+  const { data: sales = [] } = useVehicleSales();
+  const { data: expenses = [] } = useExpenses();
   const { balance: bankBalance } = useTinkBalance();
-  const { obligations, isLoading: obligationsLoading } = useFinancialObligations();
+  const { obligations = [], isLoading: obligationsLoading } = useFinancialObligations();
 
   const monthlyRevenue = salesStats?.totalSales || 0;
   const monthlyExpenses = expenseStats?.totalExpenses || 0;
   const netProfit = monthlyRevenue - monthlyExpenses;
   const profitMargin = monthlyRevenue > 0 ? (netProfit / monthlyRevenue) * 100 : 0;
 
-  const totalObligations = obligations?.reduce((sum, o) => sum + (o.outstanding_balance || 0), 0) || 0;
-  const dueObligations = obligations?.filter(o => new Date(o.due_date || '') <= new Date()).reduce((sum, o) => sum + (o.outstanding_balance || 0), 0) || 0;
+  const totalObligations = obligations?.reduce((sum: number, o: any) => sum + (o.outstanding_balance || 0), 0) || 0;
+  const dueObligations = obligations?.filter((o: any) => new Date(o.due_date || '') <= new Date()).reduce((sum: number, o: any) => sum + (o.outstanding_balance || 0), 0) || 0;
 
   const expenseByCategory = expenseStats?.categoryBreakdown || [];
+
+  // Prepare export data
+  const exportData = {
+    salesStats,
+    expenseStats,
+    sales,
+    expenses,
+    financialMetrics: {
+      bankBalance,
+      totalObligations,
+      dueObligations,
+      monthlyRevenue,
+      monthlyExpenses,
+      netProfit,
+      profitMargin
+    },
+    obligations
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Finance Dashboard</h1>
-        <p className="text-muted-foreground">Financial overview for {format(new Date(), 'MMMM yyyy')}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Finance Dashboard</h1>
+          <p className="text-muted-foreground">Financial overview for {format(new Date(), 'MMMM yyyy')}</p>
+        </div>
+        <PDFExportButton
+          data={exportData}
+          reportTitle="Finance Report"
+          startDate={new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}
+          endDate={new Date()}
+          defaultFormat="xlsx"
+        />
       </div>
 
       {/* Key Metrics */}

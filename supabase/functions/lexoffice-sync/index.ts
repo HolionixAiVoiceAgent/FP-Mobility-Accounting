@@ -49,7 +49,7 @@ serve(async (req) => {
     if (salesError) throw salesError;
 
     let invoicesCreated = 0;
-    let errors: string[] = [];
+    const errors: string[] = [];
 
     // Create invoices in Lexoffice for each sale
     for (const sale of sales || []) {

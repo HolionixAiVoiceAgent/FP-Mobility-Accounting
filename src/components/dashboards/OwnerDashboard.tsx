@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useInventoryStats } from '@/hooks/useInventory';
-import { useVehicleSalesStats } from '@/hooks/useVehicleSales';
-import { useExpenseStats } from '@/hooks/useExpenses';
+import { useInventory, useInventoryStats } from '@/hooks/useInventory';
+import { useVehicleSales, useVehicleSalesStats } from '@/hooks/useVehicleSales';
+import { useExpenses, useExpenseStats } from '@/hooks/useExpenses';
 import { useTinkBalance } from '@/hooks/useTinkBalance';
 import { useCustomers } from '@/hooks/useCustomers';
 import { useFinancialMetrics } from '@/hooks/useFinancialMetrics';
@@ -11,25 +11,21 @@ import { Euro, TrendingUp, TrendingDown, Car, Users, AlertCircle, Lock } from 'l
 import { format } from 'date-fns';
 import { DashboardCharts } from '../DashboardCharts';
 import { PDFExportButton } from '../PDFExportButton';
-import { AdvancedKPIsSection } from '../AdvancedKPIsSection';
-import { CashFlowWidget } from '../widgets/CashFlowWidget';
-import { PipelineWidget } from '../widgets/PipelineWidget';
-import { InventoryAgingWidget } from '../widgets/InventoryAgingWidget';
-import { ProfitMarginWidget } from '../widgets/ProfitMarginWidget';
-import { ObligationsWidget } from '../widgets/ObligationsWidget';
-import { TopModelsWidget } from '../widgets/TopModelsWidget';
-import { PerformanceWidget } from '../widgets/PerformanceWidget';
-import { CustomerSegmentationWidget } from '../widgets/CustomerSegmentationWidget';
-import { PredictiveAnalyticsWidget } from '../widgets/PredictiveAnalyticsWidget';
 
 export function OwnerDashboard() {
-  const { data: inventoryStats, isLoading: inventoryLoading } = useInventoryStats();
-  const { data: salesStats, isLoading: salesLoading } = useVehicleSalesStats();
-  const { data: expenseStats, isLoading: expensesLoading } = useExpenseStats();
+  const { data: inventory, isLoading: inventoryLoading } = useInventory();
+  const { data: inventoryStats, isLoading: inventoryStatsLoading } = useInventoryStats();
+  const { data: sales, isLoading: salesLoading } = useVehicleSales();
+  const { data: salesStats, isLoading: salesStatsLoading } = useVehicleSalesStats();
+  const { data: expenses, isLoading: expensesLoading } = useExpenses();
+  const { data: expenseStats, isLoading: expenseStatsLoading } = useExpenseStats();
   const { data: financialMetrics, isLoading: financialLoading } = useFinancialMetrics();
   const { balance: bankBalance } = useTinkBalance();
   const { customers } = useCustomers();
   const visibility = useDashboardVisibility();
+
+  const isLoading = inventoryLoading || salesLoading || expensesLoading || financialLoading || 
+                    inventoryStatsLoading || salesStatsLoading || expenseStatsLoading;
 
   const monthlyRevenue = salesStats?.totalSales || 0;
   const monthlyExpenses = expenseStats?.totalExpenses || 0;
@@ -42,7 +38,7 @@ export function OwnerDashboard() {
     revenue: month.revenue,
     expenses: month.expenses,
     profit: month.net_profit,
-    vehiclesSold: 0, // This would need to be calculated from sales data
+    vehiclesSold: 0,
   })) || [];
 
   const revenueBySource = [
@@ -50,8 +46,6 @@ export function OwnerDashboard() {
     { name: 'Bank Commissions', value: 0 },
     { name: 'Insurance Commissions', value: 0 },
   ];
-
-  const isLoading = inventoryLoading || salesLoading || expensesLoading || financialLoading;
 
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
@@ -62,10 +56,24 @@ export function OwnerDashboard() {
           <p className="text-xs sm:text-sm text-muted-foreground">Complete business overview for {format(new Date(), 'MMMM yyyy')}</p>
         </div>
         <PDFExportButton 
-          data={{ inventoryStats, salesStats, expenseStats, financialMetrics }}
+          data={{ 
+            inventoryStats, 
+            salesStats, 
+            expenseStats, 
+            financialMetrics,
+            inventory: inventory || [],
+            sales: sales || [],
+            expenses: expenses || [],
+            customers: customers || [],
+            payments: salesStats?.pendingPayments || 0,
+            cashAdvances: [],
+            obligations: [],
+            vehiclePurchases: []
+          }}
           reportTitle="Dashboard Report"
           startDate={new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}
           endDate={new Date()}
+          defaultFormat="xlsx"
         />
       </div>
 
@@ -253,7 +261,7 @@ export function OwnerDashboard() {
         </Card>
       </div>
 
-      {/* Charts - Now with real-time data from financial metrics */}
+      {/* Charts */}
       <div className="mt-4 sm:mt-8">
         {!visibility.showFinancialMetrics ? (
           <Card>
@@ -271,37 +279,7 @@ export function OwnerDashboard() {
           <DashboardCharts salesData={salesData} revenueBySource={revenueBySource} />
         )}
       </div>
-
-      {/* Advanced KPIs Section */}
-      <div className="mt-4 sm:mt-8">
-        <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Key Performance Indicators</h2>
-        <AdvancedKPIsSection />
-      </div>
-
-      {/* Advanced Widgets: 1 col mobile, 2 cols tablet, 3 cols desktop */}
-      <div className="mt-4 sm:mt-8">
-        <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Advanced Analytics</h2>
-        {!visibility.showAdvancedAnalytics ? (
-          <Card>
-            <CardContent className="pt-6 flex items-center justify-center gap-2 text-muted-foreground">
-              <Lock className="h-5 w-5" />
-              <span className="text-sm">Advanced analytics are restricted for your role</span>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <CashFlowWidget />
-            <PipelineWidget />
-            <InventoryAgingWidget />
-            <ProfitMarginWidget />
-            <PredictiveAnalyticsWidget />
-            <ObligationsWidget />
-            <TopModelsWidget />
-            <PerformanceWidget />
-            <CustomerSegmentationWidget />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
+

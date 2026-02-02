@@ -27,13 +27,25 @@ export const useVehicleSales = () => {
   const query = useQuery({
     queryKey: ['vehicle-sales'],
     queryFn: async (): Promise<VehicleSale[]> => {
-      const { data, error } = await supabase
-        .from('vehicle_sales')
-        .select('*')
-        .order('sale_date', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('vehicle_sales')
+          .select('*')
+          .order('sale_date', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+        if (error) {
+          // Check if table doesn't exist
+          if (error.message?.includes('relation') || error.message?.includes('not exist')) {
+            console.warn('Vehicle sales table not found, returning empty data');
+            return [];
+          }
+          throw error;
+        }
+        return data || [];
+      } catch (error) {
+        console.warn('Error fetching vehicle sales:', error);
+        return [];
+      }
     },
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     staleTime: 2000,
@@ -68,34 +80,56 @@ export const useVehicleSalesStats = () => {
   const query = useQuery({
     queryKey: ['vehicle-sales-stats'],
     queryFn: async () => {
-      const { data: sales, error } = await supabase
-        .from('vehicle_sales')
-        .select('*');
+      try {
+        const { data: sales, error } = await supabase
+          .from('vehicle_sales')
+          .select('*');
 
-      if (error) throw error;
+        // Handle missing table gracefully
+        if (error) {
+          if (error.message?.includes('relation') || error.message?.includes('not exist')) {
+            console.warn('Vehicle sales table not found, returning default stats');
+            return {
+              totalSales: 0,
+              vehiclesSold: 0,
+              averagePrice: 0,
+              pendingPayments: 0
+            };
+          }
+          throw error;
+        }
 
-      const currentDate = new Date();
-      const currentMonth = currentDate.getMonth();
-      const currentYear = currentDate.getFullYear();
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
 
-      const salesThisMonth = sales?.filter(sale => {
-        const saleDate = new Date(sale.sale_date);
-        return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
-      }) || [];
+        const salesThisMonth = sales?.filter(sale => {
+          const saleDate = new Date(sale.sale_date);
+          return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
+        }) || [];
 
-      const totalSales = salesThisMonth.reduce((sum, sale) => sum + sale.sale_price, 0);
-      const vehiclesSold = salesThisMonth.length;
-      const averagePrice = vehiclesSold > 0 ? totalSales / vehiclesSold : 0;
-      const pendingPayments = sales?.filter(sale => 
-        sale.payment_status === 'pending' || sale.payment_status === 'partial'
-      ).reduce((sum, sale) => sum + sale.sale_price, 0) || 0;
+        const totalSales = salesThisMonth.reduce((sum, sale) => sum + sale.sale_price, 0);
+        const vehiclesSold = salesThisMonth.length;
+        const averagePrice = vehiclesSold > 0 ? totalSales / vehiclesSold : 0;
+        const pendingPayments = sales?.filter(sale => 
+          sale.payment_status === 'pending' || sale.payment_status === 'partial'
+        ).reduce((sum, sale) => sum + sale.sale_price, 0) || 0;
 
-      return {
-        totalSales,
-        vehiclesSold,
-        averagePrice,
-        pendingPayments
-      };
+        return {
+          totalSales,
+          vehiclesSold,
+          averagePrice,
+          pendingPayments
+        };
+      } catch (error) {
+        console.warn('Error fetching vehicle sales stats:', error);
+        return {
+          totalSales: 0,
+          vehiclesSold: 0,
+          averagePrice: 0,
+          pendingPayments: 0
+        };
+      }
     },
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     staleTime: 2000,

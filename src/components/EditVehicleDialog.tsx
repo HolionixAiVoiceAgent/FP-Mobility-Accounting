@@ -319,10 +319,10 @@ export function EditVehicleDialog({ vehicle }: EditVehicleDialogProps) {
           </div>
 
           {/* Vehicle Photo Upload Section */}
-          {formData.inventory_id && (
+          {vehicle.id && (
             <div className="mt-6">
               <h3 className="font-semibold mb-2">Vehicle Photos</h3>
-              <VehicleImageUpload inventoryId={formData.inventory_id} />
+              <VehicleImageUpload inventoryId={vehicle.id} />
             </div>
           )}
 

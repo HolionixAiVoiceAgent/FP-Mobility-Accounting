@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useVehicleSalesStats } from '@/hooks/useVehicleSales';
+import { useVehicleSalesStats, useVehicleSales } from '@/hooks/useVehicleSales';
 import { useInventoryStats } from '@/hooks/useInventory';
+import { PDFExportButton } from '../PDFExportButton';
 import { TrendingUp, Target, DollarSign, Users } from 'lucide-react';
 import { format } from 'date-fns';
 
 export function SalesDashboard() {
   const { data: salesStats, isLoading: salesLoading } = useVehicleSalesStats();
+  const { data: sales = [], isLoading: salesListLoading } = useVehicleSales();
   const { data: inventoryStats } = useInventoryStats();
 
   const conversionRate = salesStats ? (salesStats.totalSales / (salesStats.totalSales + 10)) * 100 : 0;
@@ -13,12 +15,34 @@ export function SalesDashboard() {
     ? salesStats.totalSales / (inventoryStats?.soldThisMonth || 1)
     : 0;
 
+  // Prepare export data
+  const exportData = {
+    salesStats,
+    sales,
+    salesMetrics: {
+      soldThisMonth: inventoryStats?.soldThisMonth || 0,
+      totalSalesRevenue: salesStats?.totalSales || 0,
+      avgSaleValue: Math.round(avgSaleValue),
+      conversionRate: conversionRate.toFixed(1),
+      pendingPayments: salesStats?.pendingPayments || 0
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Sales Dashboard</h1>
-        <p className="text-muted-foreground">Pipeline & performance metrics for {format(new Date(), 'MMMM yyyy')}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Sales Dashboard</h1>
+          <p className="text-muted-foreground">Pipeline & performance metrics for {format(new Date(), 'MMMM yyyy')}</p>
+        </div>
+        <PDFExportButton
+          data={exportData}
+          reportTitle="Sales Report"
+          startDate={new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)}
+          endDate={new Date()}
+          defaultFormat="xlsx"
+        />
       </div>
 
       {/* Key Metrics */}

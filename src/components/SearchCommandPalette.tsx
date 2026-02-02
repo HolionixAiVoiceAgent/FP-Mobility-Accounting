@@ -41,7 +41,7 @@ export function SearchCommandPalette({
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = externalOnOpenChange || setInternalOpen;
 
-  const { results, loading, clear: clearSearch } = useGlobalSearch();
+  const { results, loading, clear: clearSearch, search: performSearch } = useGlobalSearch();
   const { getHistory, addToHistory, clearHistory } = useSearchHistory();
   const [history, setHistory] = useState<Array<{ query: string; timestamp: number }>>([]);
 
@@ -83,11 +83,11 @@ export function SearchCommandPalette({
   // Search on query change
   useEffect(() => {
     if (query.trim()) {
-      useGlobalSearch().search(query);
+      performSearch(query);
     } else {
       clearSearch();
     }
-  }, [query, clearSearch]);
+  }, [query, clearSearch, performSearch]);
 
   // Display history if no query
   const displayResults = query.trim() ? results : history.slice(0, 5);
@@ -100,21 +100,26 @@ export function SearchCommandPalette({
 
     // Navigate based on type
     switch (result.type) {
-      case 'vehicle':
+      case 'vehicle': {
         navigate(`/inventory`, { state: { selectedVehicleId: result.id } });
         break;
-      case 'customer':
+      }
+      case 'customer': {
         navigate(`/customers`, { state: { selectedCustomerId: result.id } });
         break;
-      case 'sale':
+      }
+      case 'sale': {
         navigate(`/sales`, { state: { selectedSaleId: result.id } });
         break;
-      case 'expense':
+      }
+      case 'expense': {
         navigate(`/expenses`, { state: { selectedExpenseId: result.id } });
         break;
-      case 'purchase':
+      }
+      case 'purchase': {
         navigate(`/purchases`, { state: { selectedPurchaseId: result.id } });
         break;
+      }
     }
 
     setOpen(false);
@@ -124,27 +129,31 @@ export function SearchCommandPalette({
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     switch (e.key) {
-      case 'ArrowDown':
+      case 'ArrowDown': {
         e.preventDefault();
         setSelectedIndex((prev) =>
           prev < displayResults.length - 1 ? prev + 1 : prev
         );
         break;
-      case 'ArrowUp':
+      }
+      case 'ArrowUp': {
         e.preventDefault();
         setSelectedIndex((prev) => (prev > 0 ? prev - 1 : 0));
         break;
-      case 'Enter':
+      }
+      case 'Enter': {
         e.preventDefault();
         const selected = displayResults[selectedIndex];
         if (selected && 'type' in selected && 'id' in selected) {
           handleSelect(selected as SearchResult);
         }
         break;
-      case 'Escape':
+      }
+      case 'Escape': {
         e.preventDefault();
         setOpen(false);
         break;
+      }
     }
   };
 

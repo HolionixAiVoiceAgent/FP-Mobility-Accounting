@@ -54,10 +54,12 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Cache successful responses
-        if (response.ok) {
-          const cache = caches.open(CACHE_NAME);
-          cache.then((c) => c.put(event.request, response.clone()));
+        // Don't cache blob responses (downloads) or responses that are already consumed
+        if (response.ok && !response.url.includes('.xlsx') && !response.url.includes('.json') && !response.url.includes('.csv')) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
         }
         return response;
       })

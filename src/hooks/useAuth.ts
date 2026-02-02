@@ -46,14 +46,31 @@ export const useAuth = () => {
 
   const fetchUserRole = async (userId: string) => {
     try {
+      // First try to get role from user_roles table
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
         .single();
 
-      if (error) throw error;
-      setRole(data?.role as UserRole);
+      if (error) {
+        // If table doesn't exist or no role assigned, try to get from employees table
+        console.warn('user_roles fetch failed, trying employees table:', error.message);
+        const { data: empData, error: empError } = await supabase
+          .from('employees')
+          .select('role')
+          .eq('user_id', userId)
+          .single();
+        
+        if (empError) {
+          console.warn('No role found in employees table:', empError.message);
+          setRole(null);
+        } else {
+          setRole(empData?.role as UserRole);
+        }
+      } else {
+        setRole(data?.role as UserRole);
+      }
     } catch (error) {
       console.error('Error fetching user role:', error);
       setRole(null);

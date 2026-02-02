@@ -31,7 +31,9 @@ export function useGlobalSearch(): SearchState {
       abortControllerRef.current.abort();
     }
 
-    if (!query || query.trim().length < 2) {
+    // Ensure query is a string before trimming
+    const queryStr = String(query || '');
+    if (!queryStr || queryStr.trim().length < 2) {
       setResults([]);
       return;
     }
@@ -39,7 +41,7 @@ export function useGlobalSearch(): SearchState {
     try {
       setLoading(true);
       setError(null);
-      const searchQuery = query.toLowerCase().trim();
+      const searchQuery = queryStr.toLowerCase().trim();
 
       // Create new abort controller for this request
       abortControllerRef.current = new AbortController();
@@ -179,6 +181,7 @@ export function useGlobalSearch(): SearchState {
     }
   }, []);
 
+  // Debounce the performSearch function
   const debouncedSearch = useDebounce(performSearch, 300);
 
   const search = useCallback((query: string) => {

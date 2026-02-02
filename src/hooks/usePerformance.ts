@@ -20,19 +20,26 @@ export function useMemoizedMetrics<T>(
 
 /**
  * Performance utility: Debounces search/filter operations to reduce queries
+ * Returns a function that delays calling the callback
  */
-export function useDebounce<T>(value: T, delayMs: number = 500): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
+export function useDebounce<T extends (...args: any[]) => any>(
+  callback: T,
+  delayMs: number = 500
+): T {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delayMs);
+  return useCallback(
+    (...args: any[]) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
 
-    return () => clearTimeout(handler);
-  }, [value, delayMs]);
-
-  return debouncedValue;
+      timeoutRef.current = setTimeout(() => {
+        callback(...args);
+      }, delayMs);
+    },
+    [callback, delayMs]
+  ) as T;
 }
 
 /**

@@ -45,7 +45,22 @@ export function useCustomers() {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      // Handle missing table gracefully
+      if (error) {
+        if (error.message?.includes('relation') || error.message?.includes('not exist')) {
+          console.warn('Customers table not found, returning empty data');
+          setCustomers([]);
+          setStats({
+            totalCustomers: 0,
+            activeCustomers: 0,
+            newThisMonth: 0,
+            totalOutstanding: 0
+          });
+          setLoading(false);
+          return;
+        }
+        throw error;
+      }
 
       setCustomers((data || []) as Customer[]);
       
@@ -64,11 +79,14 @@ export function useCustomers() {
         totalOutstanding
       });
     } catch (error) {
-      console.error('Error fetching customers:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load customers',
-        variant: 'destructive'
+      console.warn('Error fetching customers:', error);
+      // Set empty data on error
+      setCustomers([]);
+      setStats({
+        totalCustomers: 0,
+        activeCustomers: 0,
+        newThisMonth: 0,
+        totalOutstanding: 0
       });
     } finally {
       setLoading(false);

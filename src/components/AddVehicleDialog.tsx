@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import QrReader from 'react-qr-barcode-scanner';
-import { VehicleImageUpload } from './VehicleImageUpload';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 export function AddVehicleDialog() {
   const [open, setOpen] = useState(false);
   const [showVinScanner, setShowVinScanner] = useState(false);
-  const [tempInventoryId, setTempInventoryId] = useState('');
   const [formData, setFormData] = useState({
     inventory_id: '',
     vin: '',
@@ -96,15 +94,14 @@ export function AddVehicleDialog() {
           <DialogTitle>Add New Vehicle</DialogTitle>
         </DialogHeader>
 
-        {/* VIN Scanner Modal */}
         {showVinScanner && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
             <div className="bg-white rounded-lg p-6 max-w-md w-full flex flex-col items-center">
               <h2 className="text-lg font-semibold mb-2">Scan VIN Barcode</h2>
               <div className="w-full h-64">
                 <QrReader
-                  onUpdate={(result, error) => {
-                    const code = (result as any)?.text;
+                  onUpdate={(result: any, error: any) => {
+                    const code = result?.text;
                     if (code) {
                       setFormData(prev => ({ ...prev, vin: code }));
                       setShowVinScanner(false);
@@ -300,16 +297,6 @@ export function AddVehicleDialog() {
             />
           </div>
 
-          {/* ...existing form fields... */}
-
-          {/* Vehicle Photo Upload Section */}
-          {formData.inventory_id && (
-            <div className="mt-6">
-              <h3 className="font-semibold mb-2">Vehicle Photos</h3>
-              <VehicleImageUpload inventoryId={formData.inventory_id} />
-            </div>
-          )}
-
           <div className="flex justify-end space-x-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
@@ -323,3 +310,4 @@ export function AddVehicleDialog() {
     </Dialog>
   );
 }
+

@@ -42,13 +42,25 @@ export const useInventory = () => {
   const query = useQuery({
     queryKey: ['inventory'],
     queryFn: async (): Promise<InventoryItem[]> => {
-      const { data, error } = await supabase
-        .from('inventory')
-        .select('*')
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('inventory')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+        if (error) {
+          // Check if table doesn't exist
+          if (error.message?.includes('relation') || error.message?.includes('not exist')) {
+            console.warn('Inventory table not found, returning empty data');
+            return [];
+          }
+          throw error;
+        }
+        return data || [];
+      } catch (error) {
+        console.warn('Error fetching inventory:', error);
+        return [];
+      }
     },
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     staleTime: 2000,
@@ -83,54 +95,81 @@ export const useInventoryStats = () => {
   const query = useQuery({
     queryKey: ['inventory-stats'],
     queryFn: async (): Promise<InventoryStats> => {
-      // Get all inventory items
-      const { data: inventory, error } = await supabase
-        .from('inventory')
-        .select('*');
+      try {
+        // Get all inventory items
+        const { data: inventory, error } = await supabase
+          .from('inventory')
+          .select('*');
 
-      if (error) throw error;
+        // Handle missing table gracefully
+        if (error) {
+          if (error.message?.includes('relation') || error.message?.includes('not exist')) {
+            console.warn('Inventory table not found, returning default stats');
+            return {
+              totalVehicles: 0,
+              availableVehicles: 0,
+              soldThisMonth: 0,
+              avgDaysInStock: 0,
+              totalInventoryValue: 0,
+              pendingRepairs: 0
+            };
+          }
+          throw error;
+        }
 
-      const items = inventory || [];
-      const currentDate = new Date();
-      const currentMonth = currentDate.getMonth();
-      const currentYear = currentDate.getFullYear();
+        const items = inventory || [];
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
 
-      const totalVehicles = items.length;
-      const availableVehicles = items.filter(item => item.status === 'available').length;
-      
-      // Calculate sold this month
-      const soldThisMonth = items.filter(item => {
-        if (!item.sale_date) return false;
-        const saleDate = new Date(item.sale_date);
-        return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
-      }).length;
+        const totalVehicles = items.length;
+        const availableVehicles = items.filter(item => item.status === 'available').length;
+        
+        // Calculate sold this month
+        const soldThisMonth = items.filter(item => {
+          if (!item.sale_date) return false;
+          const saleDate = new Date(item.sale_date);
+          return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
+        }).length;
 
-      // Calculate average days in stock
-      const daysInStock = items.map(item => {
-        const purchaseDate = new Date(item.purchase_date);
-        const endDate = item.sale_date ? new Date(item.sale_date) : currentDate;
-        return Math.floor((endDate.getTime() - purchaseDate.getTime()) / (1000 * 3600 * 24));
-      });
-      const avgDaysInStock = daysInStock.length > 0 
-        ? Math.round(daysInStock.reduce((sum, days) => sum + days, 0) / daysInStock.length)
-        : 0;
+        // Calculate average days in stock
+        const daysInStock = items.map(item => {
+          const purchaseDate = new Date(item.purchase_date);
+          const endDate = item.sale_date ? new Date(item.sale_date) : currentDate;
+          return Math.floor((endDate.getTime() - purchaseDate.getTime()) / (1000 * 3600 * 24));
+        });
+        const avgDaysInStock = daysInStock.length > 0 
+          ? Math.round(daysInStock.reduce((sum, days) => sum + days, 0) / daysInStock.length)
+          : 0;
 
-      // Calculate total inventory value (available vehicles only)
-      const totalInventoryValue = items
-        .filter(item => item.status === 'available')
-        .reduce((sum, item) => sum + (item.expected_sale_price || item.purchase_price), 0);
+        // Calculate total inventory value (available vehicles only)
+        const totalInventoryValue = items
+          .filter(item => item.status === 'available')
+          .reduce((sum, item) => sum + (item.expected_sale_price || item.purchase_price), 0);
 
-      // Count pending repairs
-      const pendingRepairs = items.filter(item => item.status === 'pending_repair').length;
+        // Count pending repairs
+        const pendingRepairs = items.filter(item => item.status === 'pending_repair').length;
 
-      return {
-        totalVehicles,
-        availableVehicles,
-        soldThisMonth,
-        avgDaysInStock,
-        totalInventoryValue,
-        pendingRepairs
-      };
+        return {
+          totalVehicles,
+          availableVehicles,
+          soldThisMonth,
+          avgDaysInStock,
+          totalInventoryValue,
+          pendingRepairs
+        };
+      } catch (error) {
+        console.warn('Error fetching inventory stats:', error);
+        // Return default stats on error
+        return {
+          totalVehicles: 0,
+          availableVehicles: 0,
+          soldThisMonth: 0,
+          avgDaysInStock: 0,
+          totalInventoryValue: 0,
+          pendingRepairs: 0
+        };
+      }
     },
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     staleTime: 2000,

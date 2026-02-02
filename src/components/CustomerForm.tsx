@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CustomerImageUpload } from './CustomerImageUpload';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ interface CustomerFormProps {
 
 export function CustomerForm({ onSubmit }: CustomerFormProps) {
   const [open, setOpen] = useState(false);
+  const [createdCustomerId, setCreatedCustomerId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     type: 'individual' as 'individual' | 'business',
     name: '',
@@ -30,28 +32,47 @@ export function CustomerForm({ onSubmit }: CustomerFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await onSubmit(formData);
-      setOpen(false);
-      setFormData({
-        type: 'individual',
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        total_purchases: 0,
-        vehicles_purchased: 0,
-        outstanding_balance: 0,
-        status: 'active',
-        customer_since: new Date().toISOString().split('T')[0],
-        last_purchase: undefined
-      });
+      const result = await onSubmit(formData);
+      
+      // If successful and result has id, show image upload section
+      if (result && result.id) {
+        setCreatedCustomerId(result.id);
+      } else {
+        setOpen(false);
+        resetForm();
+      }
     } catch (error) {
       console.error('Failed to add customer:', error);
     }
   };
 
+  const resetForm = () => {
+    setFormData({
+      type: 'individual',
+      name: '',
+      email: '',
+      phone: '',
+      address: '',
+      total_purchases: 0,
+      vehicles_purchased: 0,
+      outstanding_balance: 0,
+      status: 'active',
+      customer_since: new Date().toISOString().split('T')[0],
+      last_purchase: undefined
+    });
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    setCreatedCustomerId(null);
+    resetForm();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => {
+      if (!v) handleClose();
+      else setOpen(true);
+    }}>
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
@@ -165,14 +186,31 @@ export function CustomerForm({ onSubmit }: CustomerFormProps) {
             </div>
           </div>
 
+          {/* Customer Photo Upload Section - Only show after customer is created */}
+          {createdCustomerId ? (
+            <div className="mt-6">
+              <h3 className="font-semibold mb-2">Customer Photos</h3>
+              <CustomerImageUpload customerDbId={createdCustomerId} />
+            </div>
+          ) : null}
+
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">Add Customer</Button>
+            {createdCustomerId ? (
+              <Button type="button" onClick={handleClose}>
+                Done
+              </Button>
+            ) : (
+              <>
+                <Button type="button" variant="outline" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button type="submit">Add Customer</Button>
+              </>
+            )}
           </div>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
+

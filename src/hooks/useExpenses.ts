@@ -25,13 +25,25 @@ export const useExpenses = () => {
   const query = useQuery({
     queryKey: ['expenses'],
     queryFn: async (): Promise<Expense[]> => {
-      const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
-        .order('date', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('expenses')
+          .select('*')
+          .order('date', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+        if (error) {
+          // Check if table doesn't exist
+          if (error.message?.includes('relation') || error.message?.includes('not exist')) {
+            console.warn('Expenses table not found, returning empty data');
+            return [];
+          }
+          throw error;
+        }
+        return data || [];
+      } catch (error) {
+        console.warn('Error fetching expenses:', error);
+        return [];
+      }
     },
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     staleTime: 2000,
@@ -66,51 +78,75 @@ export const useExpenseStats = () => {
   const query = useQuery({
     queryKey: ['expense-stats'],
     queryFn: async () => {
-      const { data: expenses, error } = await supabase
-        .from('expenses')
-        .select('*');
+      try {
+        const { data: expenses, error } = await supabase
+          .from('expenses')
+          .select('*');
 
-      if (error) throw error;
+        // Handle missing table gracefully
+        if (error) {
+          if (error.message?.includes('relation') || error.message?.includes('not exist')) {
+            console.warn('Expenses table not found, returning default stats');
+            return {
+              totalExpenses: 0,
+              recurringExpenses: 0,
+              oneTimeExpenses: 0,
+              pendingExpenses: 0,
+              categoryBreakdown: []
+            };
+          }
+          throw error;
+        }
 
-      const currentDate = new Date();
-      const currentMonth = currentDate.getMonth();
-      const currentYear = currentDate.getFullYear();
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
 
-      const expensesThisMonth = expenses?.filter(expense => {
-        const expenseDate = new Date(expense.date);
-        return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
-      }) || [];
+        const expensesThisMonth = expenses?.filter(expense => {
+          const expenseDate = new Date(expense.date);
+          return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
+        }) || [];
 
-      const totalExpenses = expensesThisMonth.reduce((sum, expense) => sum + expense.amount, 0);
-      const recurringExpenses = expensesThisMonth
-        .filter(expense => ['Office Rent', 'Vehicle Insurance', 'Staff Salaries'].includes(expense.category))
-        .reduce((sum, expense) => sum + expense.amount, 0);
-      const oneTimeExpenses = totalExpenses - recurringExpenses;
-      const pendingExpenses = 0; // This would need a status field
+        const totalExpenses = expensesThisMonth.reduce((sum, expense) => sum + expense.amount, 0);
+        const recurringExpenses = expensesThisMonth
+          .filter(expense => ['Office Rent', 'Vehicle Insurance', 'Staff Salaries'].includes(expense.category))
+          .reduce((sum, expense) => sum + expense.amount, 0);
+        const oneTimeExpenses = totalExpenses - recurringExpenses;
+        const pendingExpenses = 0; // This would need a status field
 
-      // Calculate category breakdown
-      const categoryMap = new Map<string, { total: number; count: number }>();
-      expensesThisMonth.forEach(expense => {
-        const existing = categoryMap.get(expense.category) || { total: 0, count: 0 };
-        categoryMap.set(expense.category, {
-          total: existing.total + expense.amount,
-          count: existing.count + 1
+        // Calculate category breakdown
+        const categoryMap = new Map<string, { total: number; count: number }>();
+        expensesThisMonth.forEach(expense => {
+          const existing = categoryMap.get(expense.category) || { total: 0, count: 0 };
+          categoryMap.set(expense.category, {
+            total: existing.total + expense.amount,
+            count: existing.count + 1
+          });
         });
-      });
 
-      const categoryBreakdown = Array.from(categoryMap.entries()).map(([category, data]) => ({
-        category,
-        total: data.total,
-        count: data.count
-      }));
+        const categoryBreakdown = Array.from(categoryMap.entries()).map(([category, data]) => ({
+          category,
+          total: data.total,
+          count: data.count
+        }));
 
-      return {
-        totalExpenses,
-        recurringExpenses,
-        oneTimeExpenses,
-        pendingExpenses,
-        categoryBreakdown
-      };
+        return {
+          totalExpenses,
+          recurringExpenses,
+          oneTimeExpenses,
+          pendingExpenses,
+          categoryBreakdown
+        };
+      } catch (error) {
+        console.warn('Error fetching expense stats:', error);
+        return {
+          totalExpenses: 0,
+          recurringExpenses: 0,
+          oneTimeExpenses: 0,
+          pendingExpenses: 0,
+          categoryBreakdown: []
+        };
+      }
     },
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     staleTime: 2000,
