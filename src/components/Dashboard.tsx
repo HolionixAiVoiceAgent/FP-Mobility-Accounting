@@ -21,12 +21,13 @@ export function Dashboard() {
     );
   }
 
-  // Route to role-specific dashboard
+  // Route to role-specific dashboard (user_roles has admin | employee; extended roles from employees table)
   switch (role) {
     case 'owner':
     case 'admin':
       return <OwnerDashboard />;
     case 'sales_manager':
+    case 'salesperson':
       return <SalesDashboard />;
     case 'accountant':
       return <FinanceDashboard />;
@@ -34,8 +35,9 @@ export function Dashboard() {
       return <HRDashboard />;
     case 'inventory_manager':
       return <InventoryDashboard />;
-    case 'salesperson':
-      return <SalesDashboard />; // Salespeople see sales dashboard
+    case 'employee':
+      // Default app role for non-admin users: show sales-focused dashboard
+      return <SalesDashboard />;
     default:
       return (
         <Card>

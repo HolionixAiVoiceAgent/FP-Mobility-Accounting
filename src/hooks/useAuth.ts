@@ -1,8 +1,20 @@
 import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { getDemoConfig, getStoredBypass, clearBypass } from '@/lib/demo-auth';
 
 export type UserRole = 'admin' | 'employee' | null;
+
+function makeDemoUser(email: string): User {
+  return {
+    id: 'demo-user-id',
+    email: email ?? 'admin@example.com',
+    app_metadata: {},
+    user_metadata: {},
+    aud: 'authenticated',
+    created_at: new Date().toISOString(),
+  } as User;
+}
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -11,6 +23,16 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const demo = getDemoConfig();
+    const bypass = demo.enabled && demo.bypassAuth ? getStoredBypass() : null;
+    if (bypass) {
+      setUser(makeDemoUser(bypass.email));
+      setSession(null);
+      setRole(bypass.role);
+      setLoading(false);
+      return;
+    }
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -64,22 +86,26 @@ export const useAuth = () => {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: email?.trim() ?? '',
+      password: password ?? '',
     });
     return { error };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
+    // Use dedicated callback URL so Supabase redirects there after email confirm.
+    // Add this exact URL to Supabase: Authentication → URL Configuration → Redirect URLs
+    const baseUrl =
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_APP_URL) ||
+      (typeof window !== 'undefined' ? window.location.origin : '');
+    const redirectUrl = baseUrl ? `${baseUrl.replace(/\/$/, '')}/auth/callback` : undefined;
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: email?.trim() ?? '',
+      password: password ?? '',
       options: {
-        emailRedirectTo: redirectUrl,
+        ...(redirectUrl && { emailRedirectTo: redirectUrl }),
         data: {
-          full_name: fullName,
+          full_name: (fullName ?? '').trim() || undefined,
         },
       },
     });
@@ -87,6 +113,7 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    clearBypass();
     const { error } = await supabase.auth.signOut();
     return { error };
   };

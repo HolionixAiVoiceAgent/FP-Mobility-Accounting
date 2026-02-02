@@ -25,6 +25,7 @@ import VehiclePurchases from "./pages/VehiclePurchases";
 import HRM from "./pages/HRM";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Optimized QueryClient configuration for real-time data updates
@@ -59,6 +60,7 @@ const App = () => (
           <HelpDialog />
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute><VehicleSales /></ProtectedRoute>} />

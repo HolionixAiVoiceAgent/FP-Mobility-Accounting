@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { getAuthErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Car } from "lucide-react";
+import { getDemoConfig, setBypass } from "@/lib/demo-auth";
+import { Car, UserCog } from "lucide-react";
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -49,24 +51,56 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    const { error } = await signUp(email, password, fullName);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Account created! Please check your email to verify your account.",
-      });
+    if (!email.trim() || !password || !fullName.trim()) {
+      toast({ title: "Error", description: "Please fill in all fields.", variant: "destructive" });
+      return;
     }
+    if (password.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters.", variant: "destructive" });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await signUp(email.trim(), password, fullName.trim());
+      if (error) {
+        toast({
+          title: "Sign up failed",
+          description: getAuthErrorMessage(error),
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({
+        title: "Account created",
+        description: "Check your email and click the verification link to sign in. If the link fails, add your app URL to Supabase → Auth → URL Configuration → Redirect URLs.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    setIsLoading(false);
+  const demo = getDemoConfig();
+  const handleDemoLogin = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await signIn(demo.email, demo.password);
+      if (error) {
+        toast({
+          title: "Demo login failed",
+          description: "Supabase may be unreachable. Try Demo (offline) if enabled.",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Success", description: "Signed in with demo account." });
+      navigate("/");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const handleDemoBypass = () => {
+    setBypass(demo.email, "admin");
+    window.location.href = "/";
   };
 
   return (
@@ -93,6 +127,7 @@ export default function Auth() {
                   <Input
                     id="signin-email"
                     type="email"
+                    autoComplete="email"
                     placeholder="email@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -104,6 +139,7 @@ export default function Auth() {
                   <Input
                     id="signin-password"
                     type="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -112,6 +148,34 @@ export default function Auth() {
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
+                {demo.enabled && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground text-center">Optional demo (dev only)</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={isLoading}
+                      onClick={handleDemoLogin}
+                    >
+                      <UserCog className="h-4 w-4 mr-2" />
+                      Demo login ({demo.email})
+                    </Button>
+                    {demo.bypassAuth && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-muted-foreground"
+                        disabled={isLoading}
+                        onClick={handleDemoBypass}
+                      >
+                        Demo (offline) – no Supabase
+                      </Button>
+                    )}
+                  </div>
+                )}
               </form>
             </TabsContent>
 
@@ -122,6 +186,7 @@ export default function Auth() {
                   <Input
                     id="signup-name"
                     type="text"
+                    autoComplete="name"
                     placeholder="John Doe"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -133,6 +198,7 @@ export default function Auth() {
                   <Input
                     id="signup-email"
                     type="email"
+                    autoComplete="email"
                     placeholder="email@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -144,6 +210,8 @@ export default function Auth() {
                   <Input
                     id="signup-password"
                     type="password"
+                    autoComplete="new-password"
+                    placeholder="At least 6 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required

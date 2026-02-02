@@ -35,6 +35,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { logError, ValidationError, DatabaseError } from '@/lib/errors';
 import { EmployeeManagement } from '@/components/EmployeeManagement';
@@ -79,6 +80,7 @@ const LEAVE_TYPES = ['sick', 'vacation', 'personal', 'unpaid'];
 export default function HRM() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdmin: authIsAdmin, loading: authLoading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState('employees');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -430,7 +432,16 @@ export default function HRM() {
     },
   });
 
-  if (!isAdmin) {
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </Layout>
+    );
+  }
+  if (!authIsAdmin && !isAdmin) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-screen">
