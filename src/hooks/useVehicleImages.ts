@@ -25,10 +25,15 @@ export const useVehicleImages = (inventoryId: string | undefined) => {
         .eq('inventory_id', inventoryId)
         .order('image_order', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching vehicle images:', error);
+        // If table doesn't exist or other error, return empty array
+        return [];
+      }
       return data || [];
     },
     enabled: !!inventoryId,
+    retry: 1,
   });
 };
 

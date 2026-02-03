@@ -341,9 +341,12 @@ export default function Inventory() {
                       </Button>
                       <QuotationDialog vehicle={vehicle} />
                       <Button variant="outline" size="sm" onClick={() => {
+                        // Open vehicle in new tab for listing or generate listing URL
+                        const listingUrl = `${window.location.origin}/inventory/${vehicle.inventory_id}`;
+                        navigator.clipboard.writeText(listingUrl);
                         toast({
-                          title: "Feature Coming Soon",
-                          description: "Online listing creation will be available soon.",
+                          title: "Listing Link Copied",
+                          description: "Share this link to publish the vehicle listing.",
                         });
                       }}>
                         <Globe className="h-4 w-4 mr-2" />

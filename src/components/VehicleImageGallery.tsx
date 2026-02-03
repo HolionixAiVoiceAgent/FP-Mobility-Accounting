@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useVehicleImages } from '@/hooks/useVehicleImages';
 
@@ -17,10 +17,13 @@ export function VehicleImageGallery({ inventoryId, open, onOpenChange }: Vehicle
   if (!images || images.length === 0) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent aria-describedby="gallery-empty-description">
           <div className="text-center py-8">
             <p className="text-muted-foreground">No images available</p>
           </div>
+          <DialogDescription id="gallery-empty-description">
+            There are no vehicle images uploaded for this inventory item.
+          </DialogDescription>
         </DialogContent>
       </Dialog>
     );
@@ -36,7 +39,10 @@ export function VehicleImageGallery({ inventoryId, open, onOpenChange }: Vehicle
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl p-0">
+      <DialogContent className="max-w-4xl p-0" aria-describedby="gallery-description">
+      <DialogDescription id="gallery-description" className="sr-only">
+        Vehicle image gallery showing {images.length} images. Use the left and right arrows to navigate between images.
+      </DialogDescription>
         <div className="relative bg-black">
           <Button
             variant="ghost"

@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +16,7 @@ export interface InventoryItem {
   purchase_price: number;
   expected_sale_price?: number;
   actual_sale_price?: number;
-  status: string;
+  status: string; // Will be one of: 'available', 'sold', 'pending_repair', 'reserved', 'in_transit'
   location?: string;
   tuv_expiry?: string;
   last_service_date?: string;
@@ -50,10 +51,11 @@ export const useInventory = () => {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 5000,
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     staleTime: 2000,
   });
 
+  // Set up real-time subscription
   useEffect(() => {
     const subscription = supabase
       .channel('inventory_updates')
@@ -85,6 +87,7 @@ export const useInventoryStats = () => {
   const query = useQuery({
     queryKey: ['inventory-stats'],
     queryFn: async (): Promise<InventoryStats> => {
+      // Get all inventory items
       const { data: inventory, error } = await supabase
         .from('inventory')
         .select('*');
@@ -99,12 +102,14 @@ export const useInventoryStats = () => {
       const totalVehicles = items.length;
       const availableVehicles = items.filter(item => item.status === 'available').length;
       
+      // Calculate sold this month
       const soldThisMonth = items.filter(item => {
         if (!item.sale_date) return false;
         const saleDate = new Date(item.sale_date);
         return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
       }).length;
 
+      // Calculate average days in stock
       const daysInStock = items.map(item => {
         const purchaseDate = new Date(item.purchase_date);
         const endDate = item.sale_date ? new Date(item.sale_date) : currentDate;
@@ -114,10 +119,12 @@ export const useInventoryStats = () => {
         ? Math.round(daysInStock.reduce((sum, days) => sum + days, 0) / daysInStock.length)
         : 0;
 
+      // Calculate total inventory value (available vehicles only)
       const totalInventoryValue = items
         .filter(item => item.status === 'available')
         .reduce((sum, item) => sum + (item.expected_sale_price || item.purchase_price), 0);
 
+      // Count pending repairs
       const pendingRepairs = items.filter(item => item.status === 'pending_repair').length;
 
       return {
@@ -129,10 +136,11 @@ export const useInventoryStats = () => {
         pendingRepairs
       };
     },
-    refetchInterval: 5000,
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
     staleTime: 2000,
   });
 
+  // Set up real-time subscription
   useEffect(() => {
     const subscription = supabase
       .channel('inventory_stats_updates')
@@ -164,39 +172,18 @@ export const useCreateInventoryItem = () => {
 
   return useMutation({
     mutationFn: async (data: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {
-      console.log('Creating inventory item:', data);
-      
-      // First do the insert without select
-      const { error: insertError } = await supabase
+      const { data: result, error } = await supabase
         .from('inventory')
-        .insert([data]);
-
-      if (insertError) {
-        console.error('Insert error:', insertError);
-        throw insertError;
-      }
-
-      // Then fetch the new item by inventory_id or vin (since we know those are unique)
-      const { data: newItem, error: fetchError } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('vin', data.vin)
+        .insert([data])
+        .select()
         .single();
 
-      if (fetchError) {
-        console.error('Fetch new item error:', fetchError);
-        return { success: true, data: null };
-      }
-
-      console.log('Create successful, fetched item:', newItem);
-      return { success: true, data: newItem };
+      if (error) throw error;
+      return result;
     },
     onSuccess: () => {
-      // Immediately refetch to ensure UI updates
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.refetchQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
-      queryClient.refetchQueries({ queryKey: ['inventory-stats'] });
       toast({
         title: "Success",
         description: "Vehicle added to inventory successfully.",
@@ -218,8 +205,6 @@ export const useUpdateInventoryItem = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...data }: Partial<InventoryItem> & { id: string }) => {
-      console.log('Updating inventory item:', { id, data });
-      
       // First do the update without select
       const { error: updateError } = await supabase
         .from('inventory')
@@ -227,41 +212,19 @@ export const useUpdateInventoryItem = () => {
         .eq('id', id);
 
       if (updateError) {
-        console.error('Update error:', updateError);
+        // If the error is about "single row", it might still have updated successfully
+        if (updateError.message.includes('single json object') || updateError.code === 'PGRST116') {
+          // The update likely succeeded, just the select failed
+          return { success: true };
+        }
         throw updateError;
       }
 
-      // Then fetch the updated item
-      const { data: updatedItem, error: fetchError } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (fetchError) {
-        console.error('Fetch updated item error:', fetchError);
-        // Even if fetch fails, the update might have succeeded
-        return { success: true, data: null };
-      }
-
-      console.log('Update successful, fetched item:', updatedItem);
-      return { success: true, data: updatedItem };
+      return { success: true };
     },
-    onSuccess: (result) => {
-      // Directly update the cache with the updated item for immediate UI feedback
-      if (result.data) {
-        queryClient.setQueryData<InventoryItem[]>(['inventory'], (oldData) => {
-          if (!oldData) return oldData;
-          return oldData.map(item => 
-            item.id === result.data!.id ? { ...item, ...result.data } : item
-          );
-        });
-      }
-      // Then refetch to ensure data consistency
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.refetchQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
-      queryClient.refetchQueries({ queryKey: ['inventory-stats'] });
       toast({
         title: "Success",
         description: "Vehicle updated successfully.",
@@ -307,3 +270,4 @@ export const useDeleteInventoryItem = () => {
     },
   });
 };
+
