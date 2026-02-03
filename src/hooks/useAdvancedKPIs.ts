@@ -52,7 +52,10 @@ export function useAdvancedKPIs() {
       // Calculate Inventory Aging
       const now = new Date();
       const agingDays = (inventory || []).map((item: any) => {
-        const createdDate = new Date(item.created_at);
+        // Use created_at or purchase_date for aging calculation
+        const itemDate = item.created_at || item.purchase_date;
+        if (!itemDate) return 0;
+        const createdDate = new Date(itemDate);
         return Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
       });
 

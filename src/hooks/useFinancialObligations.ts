@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,6 +22,7 @@ export interface FinancialObligation {
 export const useFinancialObligations = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const subscriptionRef = useRef<any>(null);
 
   const { data: obligations, isLoading } = useQuery({
     queryKey: ["financial-obligations"],
@@ -33,7 +35,32 @@ export const useFinancialObligations = () => {
       if (error) throw error;
       return data as FinancialObligation[];
     },
+    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    staleTime: 2000,
   });
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const subscription = supabase
+      .channel("financial_obligations_updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "financial_obligations" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["financial-obligations"] });
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
+    };
+  }, [queryClient]);
 
   const addObligation = useMutation({
     mutationFn: async (obligation: Omit<FinancialObligation, "id" | "created_at" | "updated_at">) => {

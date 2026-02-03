@@ -180,6 +180,7 @@ export function useCustomers() {
     return () => {
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
       }
       if (refetchIntervalRef.current) {
         clearInterval(refetchIntervalRef.current);

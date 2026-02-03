@@ -46,9 +46,11 @@ export function useInventoryMetrics() {
           reservedCount += 1;
         }
 
-        if (vehicle.date_added) {
+        // Use created_at (or purchase_date) for inventory aging calculation
+        const vehicleDate = vehicle.created_at || vehicle.purchase_date;
+        if (vehicleDate) {
           const daysInStock = Math.floor(
-            (now.getTime() - new Date(vehicle.date_added).getTime()) / (1000 * 60 * 60 * 24)
+            (now.getTime() - new Date(vehicleDate).getTime()) / (1000 * 60 * 60 * 24)
           );
           totalDays += daysInStock;
 

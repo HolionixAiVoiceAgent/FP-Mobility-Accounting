@@ -55,7 +55,10 @@ export const useVehicleSales = () => {
     subscriptionRef.current = subscription;
 
     return () => {
-      supabase.removeChannel(subscription);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
   }, [query]);
 
@@ -68,27 +71,35 @@ export const useVehicleSalesStats = () => {
   const query = useQuery({
     queryKey: ['vehicle-sales-stats'],
     queryFn: async () => {
-      const { data: sales, error } = await supabase
-        .from('vehicle_sales')
-        .select('*');
-
-      if (error) throw error;
-
+      // Get current month date range for database-level filtering
       const currentDate = new Date();
-      const currentMonth = currentDate.getMonth();
       const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1;
+      const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+      const endOfMonth = new Date(currentYear, currentMonth, 0);
+      
+      // Fetch sales data with proper date filtering at database level
+      const { data: salesThisMonth, error: currentMonthError } = await supabase
+        .from('vehicle_sales')
+        .select('sale_price, payment_status')
+        .gte('sale_date', startOfMonth.toISOString())
+        .lte('sale_date', endOfMonth.toISOString());
 
-      const salesThisMonth = sales?.filter(sale => {
-        const saleDate = new Date(sale.sale_date);
-        return saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear;
-      }) || [];
+      const { data: allSales, error: allSalesError } = await supabase
+        .from('vehicle_sales')
+        .select('sale_price, payment_status');
 
-      const totalSales = salesThisMonth.reduce((sum, sale) => sum + sale.sale_price, 0);
-      const vehiclesSold = salesThisMonth.length;
+      if (currentMonthError || allSalesError) throw currentMonthError || allSalesError;
+
+      // Calculate statistics
+      const totalSales = salesThisMonth?.reduce((sum, sale) => sum + (sale.sale_price || 0), 0) || 0;
+      const vehiclesSold = salesThisMonth?.length || 0;
       const averagePrice = vehiclesSold > 0 ? totalSales / vehiclesSold : 0;
-      const pendingPayments = sales?.filter(sale => 
+      
+      // Calculate pending payments from all sales
+      const pendingPayments = allSales?.filter(sale => 
         sale.payment_status === 'pending' || sale.payment_status === 'partial'
-      ).reduce((sum, sale) => sum + sale.sale_price, 0) || 0;
+      ).reduce((sum, sale) => sum + (sale.sale_price || 0), 0) || 0;
 
       return {
         totalSales,
@@ -117,9 +128,13 @@ export const useVehicleSalesStats = () => {
     subscriptionRef.current = subscription;
 
     return () => {
-      supabase.removeChannel(subscription);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
   }, [query]);
 
   return query;
 };
+

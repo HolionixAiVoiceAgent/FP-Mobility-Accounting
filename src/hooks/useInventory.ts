@@ -70,7 +70,10 @@ export const useInventory = () => {
     subscriptionRef.current = subscription;
 
     return () => {
-      supabase.removeChannel(subscription);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
   }, [query]);
 
@@ -152,7 +155,10 @@ export const useInventoryStats = () => {
     subscriptionRef.current = subscription;
 
     return () => {
-      supabase.removeChannel(subscription);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
   }, [query]);
 

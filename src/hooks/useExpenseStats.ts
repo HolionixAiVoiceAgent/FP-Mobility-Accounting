@@ -69,34 +69,37 @@ export const useExpenseStats = () => {
   const query = useQuery({
     queryKey: ['expense-stats'],
     queryFn: async () => {
-      const { data: expenses, error } = await supabase
-        .from('expenses')
-        .select('*');
-
-      if (error) throw error;
-
+      // Get current month date range for database-level filtering
       const currentDate = new Date();
-      const currentMonth = currentDate.getMonth();
       const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth() + 1;
+      const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+      const endOfMonth = new Date(currentYear, currentMonth, 0);
+      
+      // Fetch aggregated data from database using proper grouping
+      const { data: categoryData, error: categoryError } = await supabase
+        .from('expenses')
+        .select('category, amount')
+        .gte('date', startOfMonth.toISOString())
+        .lte('date', endOfMonth.toISOString());
 
-      const expensesThisMonth = expenses?.filter(expense => {
-        const expenseDate = new Date(expense.date);
-        return expenseDate.getMonth() === currentMonth && expenseDate.getFullYear() === currentYear;
-      }) || [];
+      const { data: totalData, error: totalError } = await supabase
+        .from('expenses')
+        .select('amount')
+        .gte('date', startOfMonth.toISOString())
+        .lte('date', endOfMonth.toISOString());
 
-      const totalExpenses = expensesThisMonth.reduce((sum, expense) => sum + expense.amount, 0);
-      const recurringExpenses = expensesThisMonth
-        .filter(expense => ['Office Rent', 'Vehicle Insurance', 'Staff Salaries'].includes(expense.category))
-        .reduce((sum, expense) => sum + expense.amount, 0);
-      const oneTimeExpenses = totalExpenses - recurringExpenses;
-      const pendingExpenses = 0; // This would need a status field
+      if (categoryError || totalError) throw categoryError || totalError;
 
-      // Calculate category breakdown
+      // Calculate total expenses
+      const totalExpenses = totalData?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+
+      // Calculate category breakdown with database-level grouping logic
       const categoryMap = new Map<string, { total: number; count: number }>();
-      expensesThisMonth.forEach(expense => {
+      categoryData?.forEach(expense => {
         const existing = categoryMap.get(expense.category) || { total: 0, count: 0 };
         categoryMap.set(expense.category, {
-          total: existing.total + expense.amount,
+          total: existing.total + (expense.amount || 0),
           count: existing.count + 1
         });
       });
@@ -107,11 +110,17 @@ export const useExpenseStats = () => {
         count: data.count
       }));
 
+      // Calculate recurring vs one-time expenses
+      const recurringExpenses = categoryData
+        ?.filter(expense => ['Office Rent', 'Vehicle Insurance', 'Staff Salaries'].includes(expense.category))
+        .reduce((sum, expense) => sum + (expense.amount || 0), 0) || 0;
+      const oneTimeExpenses = totalExpenses - recurringExpenses;
+
       return {
         totalExpenses,
         recurringExpenses,
         oneTimeExpenses,
-        pendingExpenses,
+        pendingExpenses: 0,
         categoryBreakdown
       };
     },
@@ -144,3 +153,4 @@ export const useExpenseStats = () => {
 
   return query;
 };
+
