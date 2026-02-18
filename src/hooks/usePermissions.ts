@@ -3,7 +3,7 @@ import { useRole, UserRole } from './useRole';
 
 /**
  * Permission levels for different features
- * Granular control over who can do what
+ * Supports 'owner', 'admin', and 'employee' roles
  */
 export interface Permission {
   view: boolean;
@@ -25,105 +25,57 @@ const PERMISSION_MATRIX: PermissionMatrix = {
   // Dashboard Permissions
   dashboard: {
     owner: { view: true, admin: true },
-    sales_manager: { view: true },
-    salesperson: { view: true },
-    accountant: { view: true },
-    hr_manager: { view: true },
-    inventory_manager: { view: true },
     admin: { view: true, admin: true },
     employee: { view: true },
-    customer: { view: false },
   },
 
   // Sales Pipeline Permissions
   sales_pipeline: {
     owner: { view: true, create: true, edit: true, delete: true, admin: true },
-    sales_manager: { view: true, create: true, edit: true, delete: false },
-    salesperson: { view: true, create: true, edit: true, delete: false },
-    accountant: { view: true },
-    hr_manager: { view: false },
-    inventory_manager: { view: false },
     admin: { view: true, create: true, edit: true, delete: true, admin: true },
     employee: { view: true, create: true, edit: true, delete: false },
-    customer: { view: false },
   },
 
   // Inventory Permissions
   inventory: {
     owner: { view: true, create: true, edit: true, delete: true, admin: true },
-    sales_manager: { view: true, create: true, edit: true, delete: false },
-    salesperson: { view: true, create: false, edit: false, delete: false },
-    accountant: { view: true },
-    hr_manager: { view: false },
-    inventory_manager: { view: true, create: true, edit: true, delete: true },
     admin: { view: true, create: true, edit: true, delete: true, admin: true },
     employee: { view: true, create: true, edit: true, delete: false },
-    customer: { view: true, create: false, edit: false, delete: false },
   },
 
   // Accounting Permissions
   accounting: {
     owner: { view: true, create: true, edit: true, delete: true, admin: true, export: true },
-    sales_manager: { view: false },
-    salesperson: { view: false },
-    accountant: { view: true, create: true, edit: true, delete: true, export: true },
-    hr_manager: { view: false },
-    inventory_manager: { view: false },
     admin: { view: true, create: true, edit: true, delete: true, admin: true, export: true },
     employee: { view: false },
-    customer: { view: false },
   },
 
   // Employees/HR Permissions
   employees: {
     owner: { view: true, create: true, edit: true, delete: true, admin: true },
-    sales_manager: { view: true, create: false, edit: false, delete: false },
-    salesperson: { view: false },
-    accountant: { view: false },
-    hr_manager: { view: true, create: true, edit: true, delete: true },
-    inventory_manager: { view: false },
     admin: { view: true, create: true, edit: true, delete: true, admin: true },
     employee: { view: false },
-    customer: { view: false },
   },
 
   // Customers Permissions
   customers: {
     owner: { view: true, create: true, edit: true, delete: true, admin: true, export: true },
-    sales_manager: { view: true, create: true, edit: true, delete: false },
-    salesperson: { view: true, create: true, edit: true, delete: false },
-    accountant: { view: true, create: false, edit: false, delete: false },
-    hr_manager: { view: false },
-    inventory_manager: { view: true, create: false, edit: false, delete: false },
-    admin: { view: true, create: true, edit: true, delete: true, admin: true },
+    admin: { view: true, create: true, edit: true, delete: true, admin: true, export: true },
     employee: { view: true, create: true, edit: true, delete: false },
-    customer: { view: true, create: false, edit: true, delete: false },
   },
 
   // Reports Permissions
   reports: {
     owner: { view: true, create: true, edit: true, delete: true, admin: true, export: true },
-    sales_manager: { view: true, create: true, edit: false, delete: false, export: true },
-    salesperson: { view: true, create: false, edit: false, delete: false, export: false },
-    accountant: { view: true, create: true, edit: true, delete: false, export: true },
-    hr_manager: { view: true, create: true, edit: false, delete: false, export: true },
-    inventory_manager: { view: true, create: true, edit: false, delete: false, export: true },
     admin: { view: true, create: true, edit: true, delete: true, admin: true, export: true },
     employee: { view: true, create: false, edit: false, delete: false, export: false },
-    customer: { view: false },
   },
 
   // Settings Permissions
   settings: {
     owner: { view: true, edit: true, admin: true },
-    sales_manager: { view: false },
-    salesperson: { view: false },
-    accountant: { view: false },
-    hr_manager: { view: false },
-    inventory_manager: { view: false },
     admin: { view: true, edit: true, admin: true },
     employee: { view: false },
-    customer: { view: false },
   },
 };
 
@@ -191,3 +143,4 @@ export const usePermissions = () => {
     getPermission,
   };
 };
+

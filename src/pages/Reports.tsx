@@ -27,6 +27,7 @@ import { useMemo, useState } from 'react';
 import { useLifetimeStats } from '@/hooks/useLifetimeStats';
 import { FinancialHealthCard } from '@/components/FinancialHealthCard';
 import { AddObligationDialog } from '@/components/AddObligationDialog';
+import * as XLSX from 'xlsx';
 
 const reportTemplates = [
   {
@@ -91,6 +92,72 @@ const reportTemplates = [
   }
 ];
 
+/**
+ * Helper function to create Excel sheet from data array
+ */
+const createExcelSheet = (data: any[], sheetName: string): XLSX.WorkSheet => {
+  if (data.length === 0) {
+    const ws = XLSX.utils.aoa_to_sheet([['No data available']]);
+    return ws;
+  }
+
+  const headers = Object.keys(data[0]);
+  const aoa: any[][] = [headers];
+
+  data.forEach(row => {
+    const rowData: any[] = [];
+    headers.forEach(header => {
+      const value = row[header];
+      // Format currency values properly
+      if (header.toLowerCase().includes('price') || 
+          header.toLowerCase().includes('amount') || 
+          header.toLowerCase().includes('profit') ||
+          header.toLowerCase().includes('balance') ||
+          header.toLowerCase().includes('revenue') ||
+          header.toLowerCase().includes('expense') ||
+          header.toLowerCase().includes('total') ||
+          header.toLowerCase().includes('cost')) {
+        rowData.push(typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.-]/g, '')) || 0);
+      } else {
+        rowData.push(value || '');
+      }
+    });
+    aoa.push(rowData);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  
+  // Set column widths
+  const colWidths = headers.map((header, i) => {
+    const maxLength = Math.max(
+      header.length,
+      ...data.map(row => {
+        const value = row[header];
+        return value ? String(value).length : 0;
+      })
+    );
+    return { wch: Math.min(maxLength + 2, 30) };
+  });
+  ws['!cols'] = colWidths;
+
+  return ws;
+};
+
+/**
+ * Download Excel file
+ */
+const downloadExcel = (workbook: XLSX.WorkBook, filename: string) => {
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([excelBuffer], { 
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
 
 export default function Reports() {
   const { toast } = useToast();
@@ -139,31 +206,40 @@ export default function Reports() {
     const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
     const profit = totalSales - totalExpenses;
     
-    const reportData = [
-      ['Item', 'Amount (€)'],
-      ['Total Sales', totalSales.toFixed(2)],
-      ['Total Expenses', totalExpenses.toFixed(2)],
-      ['Net Profit', profit.toFixed(2)],
-      [''],
-      ['Sales Breakdown'],
-      ...vehicleSales.map(sale => [`${sale.vehicle_make} ${sale.vehicle_model}`, sale.sale_price.toFixed(2)]),
-      [''],
-      ['Expense Breakdown'],
-      ...expenses.map(expense => [expense.description, expense.amount.toFixed(2)])
+    const summaryData = [
+      { 'Item': 'Total Sales', 'Amount (€)': totalSales },
+      { 'Item': 'Total Expenses', 'Amount (€)': totalExpenses },
+      { 'Item': 'Net Profit', 'Amount (€)': profit },
     ];
+
+    const salesData = vehicleSales.map(sale => ({
+      'Vehicle': `${sale.vehicle_year} ${sale.vehicle_make} ${sale.vehicle_model}`,
+      'Sale Price (€)': sale.sale_price,
+      'Purchase Price (€)': sale.purchase_price,
+      'Profit (€)': sale.profit || 0,
+      'Sale Date': sale.sale_date,
+      'Payment Status': sale.payment_status
+    }));
+
+    const expensesData = expenses.map(expense => ({
+      'Category': expense.category,
+      'Description': expense.description,
+      'Amount (€)': expense.amount,
+      'Date': expense.date,
+      'Vendor': expense.vendor || 'N/A'
+    }));
+
+    // Create workbook with multiple sheets
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, createExcelSheet(summaryData, 'Summary'), 'Summary');
+    XLSX.utils.book_append_sheet(workbook, createExcelSheet(salesData, 'Sales'), 'Sales');
+    XLSX.utils.book_append_sheet(workbook, createExcelSheet(expensesData, 'Expenses'), 'Expenses');
     
-    const csvContent = reportData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pl_statement_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadExcel(workbook, `pl_statement_${new Date().toISOString().split('T')[0]}.xlsx`);
     
     toast({
       title: "P&L Report Generated",
-      description: "Monthly profit & loss statement has been downloaded.",
+      description: "Monthly profit & loss statement has been downloaded as Excel.",
     });
   };
 
@@ -177,31 +253,27 @@ export default function Reports() {
       return;
     }
     
-    const reportData = [
-      ['Sale ID', 'Vehicle', 'Sale Price', 'Purchase Price', 'Profit', 'Date', 'Payment Status'],
-      ...vehicleSales.map(sale => [
-        sale.sale_id,
-        `${sale.vehicle_year} ${sale.vehicle_make} ${sale.vehicle_model}`,
-        sale.sale_price.toFixed(2),
-        sale.purchase_price.toFixed(2),
-        (sale.profit || 0).toFixed(2),
-        sale.sale_date,
-        sale.payment_status
-      ])
-    ];
+    const salesData = vehicleSales.map(sale => ({
+      'Sale ID': sale.sale_id,
+      'Vehicle': `${sale.vehicle_year} ${sale.vehicle_make} ${sale.vehicle_model}`,
+      'VIN': sale.vin,
+      'Sale Price (€)': sale.sale_price,
+      'Purchase Price (€)': sale.purchase_price,
+      'Profit (€)': sale.profit || 0,
+      'Sale Date': sale.sale_date,
+      'Payment Status': sale.payment_status,
+      'Payment Method': sale.payment_method || '',
+      'Notes': sale.notes || ''
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, createExcelSheet(salesData, 'Vehicle Sales'), 'Vehicle Sales');
     
-    const csvContent = reportData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `vehicle_sales_report_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadExcel(workbook, `vehicle_sales_report_${new Date().toISOString().split('T')[0]}.xlsx`);
     
     toast({
       title: "Sales Report Generated",
-      description: "Vehicle sales report has been downloaded.",
+      description: "Vehicle sales report has been downloaded as Excel.",
     });
   };
 
@@ -219,35 +291,33 @@ export default function Reports() {
       acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
       return acc;
     }, {} as Record<string, number>);
+
+    const categoryData = Object.entries(categoryTotals).map(([category, amount]) => ({
+      'Category': category,
+      'Total Amount (€)': amount
+    }));
+
+    const expensesData = expenses.map(expense => ({
+      'Expense ID': expense.expense_id,
+      'Category': expense.category,
+      'Description': expense.description,
+      'Amount (€)': expense.amount,
+      'Date': expense.date,
+      'Vendor': expense.vendor || 'N/A',
+      'Payment Type': expense.payment_type || 'account',
+      'Tax Deductible': expense.tax_deductible ? 'Yes' : 'No'
+    }));
+
+    // Create workbook with category summary and detailed expenses
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, createExcelSheet(categoryData, 'Category Summary'), 'Category Summary');
+    XLSX.utils.book_append_sheet(workbook, createExcelSheet(expensesData, 'Detailed Expenses'), 'Detailed Expenses');
     
-    const reportData = [
-      ['Category', 'Total Amount (€)'],
-      ...Object.entries(categoryTotals).map(([category, amount]) => [category, amount.toFixed(2)]),
-      [''],
-      ['Detailed Expenses'],
-      ['ID', 'Category', 'Description', 'Amount', 'Date', 'Vendor'],
-      ...expenses.map(expense => [
-        expense.expense_id,
-        expense.category,
-        expense.description,
-        expense.amount.toFixed(2),
-        expense.date,
-        expense.vendor || 'N/A'
-      ])
-    ];
-    
-    const csvContent = reportData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `expense_breakdown_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadExcel(workbook, `expense_breakdown_${new Date().toISOString().split('T')[0]}.xlsx`);
     
     toast({
       title: "Expense Report Generated",
-      description: "Expense breakdown report has been downloaded.",
+      description: "Expense breakdown report has been downloaded as Excel.",
     });
   };
 
@@ -261,31 +331,29 @@ export default function Reports() {
       return;
     }
     
-    const reportData = [
-      ['Customer ID', 'Name', 'Email', 'Total Purchases', 'Vehicles Purchased', 'Outstanding Balance', 'Customer Since'],
-      ...customers.map(customer => [
-        customer.customer_id,
-        customer.name,
-        customer.email,
-        (customer.total_purchases || 0).toFixed(2),
-        customer.vehicles_purchased || 0,
-        (customer.outstanding_balance || 0).toFixed(2),
-        customer.customer_since
-      ])
-    ];
+    const customerData = customers.map(customer => ({
+      'Customer ID': customer.customer_id,
+      'Name': customer.name,
+      'Email': customer.email,
+      'Phone': customer.phone,
+      'Address': customer.address,
+      'Type': customer.type,
+      'Status': customer.status,
+      'Total Purchases (€)': customer.total_purchases,
+      'Vehicles Purchased': customer.vehicles_purchased,
+      'Outstanding Balance (€)': customer.outstanding_balance,
+      'Customer Since': customer.customer_since,
+      'Last Purchase': customer.last_purchase || ''
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, createExcelSheet(customerData, 'Customers'), 'Customers');
     
-    const csvContent = reportData.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `customer_analysis_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadExcel(workbook, `customer_analysis_${new Date().toISOString().split('T')[0]}.xlsx`);
     
     toast({
       title: "Customer Report Generated",
-      description: "Customer analysis report has been downloaded.",
+      description: "Customer analysis report has been downloaded as Excel.",
     });
   };
 
@@ -335,7 +403,7 @@ export default function Reports() {
 
       if (error) throw error;
 
-      // Create blob and download
+      // Create blob and download (DATEV is CSV format, keeping as is)
       const blob = new Blob([data], { type: "text/csv" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -775,3 +843,4 @@ export default function Reports() {
     </Layout>
   );
 }
+

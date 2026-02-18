@@ -49,7 +49,7 @@ export function AddVehicleDialog() {
     }
 
     try {
-      await createMutation.mutateAsync({
+      const result = await createMutation.mutateAsync({
         inventory_id: formData.inventory_id || null,
         vin: formData.vin,
         make: formData.make,
@@ -69,6 +69,7 @@ export function AddVehicleDialog() {
         notes: formData.notes || null
       });
       
+      console.log('Vehicle added result:', result);
       setOpen(false);
       setFormData({
         inventory_id: '',
@@ -87,8 +88,13 @@ export function AddVehicleDialog() {
         purchase_date: new Date().toISOString().split('T')[0],
         notes: ''
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding vehicle:', error);
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to add vehicle. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

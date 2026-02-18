@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2 } from "lucide-react";
+import { Trash2, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -17,8 +17,14 @@ export function BulkDeleteDialog({ type, onDeleteComplete }: BulkDeleteDialogPro
   const { toast } = useToast();
   const { isAdmin } = useAuth();
 
+  // Show disabled button with lock icon for non-admins instead of hiding
   if (!isAdmin) {
-    return null;
+    return (
+      <Button variant="outline" size="sm" disabled title="Only admins can delete all items">
+        <Lock className="mr-2 h-4 w-4" />
+        {type === 'all' ? 'Clear All Data' : `Delete All ${type}`}
+      </Button>
+    );
   }
 
   const handleDelete = async () => {

@@ -20,6 +20,7 @@ export function useMemoizedMetrics<T>(
 
 /**
  * Performance utility: Debounces search/filter operations to reduce queries
+ * Returns a debounced version of the value that updates after the delay
  */
 export function useDebounce<T>(value: T, delayMs: number = 500): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -36,16 +37,17 @@ export function useDebounce<T>(value: T, delayMs: number = 500): T {
 }
 
 /**
- * Performance utility: Debounced callback for API calls
+ * Performance utility: Creates a debounced version of a callback function
+ * Use this when you want to debounce function calls, not values
  */
-export function useDebouncedCallback<T extends (...args: any[]) => any>(
+export function useDebouncedFn<T extends (...args: any[]) => any>(
   callback: T,
-  delayMs: number = 500
-): T {
+  delayMs: number = 300
+): (...args: Parameters<T>) => void {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   return useCallback(
-    (...args: any[]) => {
+    (...args: Parameters<T>) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -55,7 +57,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
       }, delayMs);
     },
     [callback, delayMs]
-  ) as T;
+  );
 }
 
 /**

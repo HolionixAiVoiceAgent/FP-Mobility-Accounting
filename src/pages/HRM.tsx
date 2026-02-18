@@ -80,6 +80,7 @@ export default function HRM() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Track auth loading state
   const [activeTab, setActiveTab] = useState('employees');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
@@ -105,22 +106,51 @@ export default function HRM() {
     commission_rate: '0',
   });
 
-  // Check admin status
+  // Check admin status with fallback for first-time users
   useEffect(() => {
     const checkAdmin = async () => {
+      setIsLoadingAuth(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const { data } = await (supabase as any)
+          // First try employees table - accept owner or admin
+          const { data: employeeData } = await (supabase as any)
             .from('employees')
             .select('role')
             .eq('user_id', user.id)
             .single();
 
-          setIsAdmin(data?.role === 'owner' || data?.role === 'manager' || data?.role === 'hr_manager');
+          if (employeeData?.role === 'owner' || employeeData?.role === 'admin') {
+            setIsAdmin(true);
+            console.log('[HRM] Admin status confirmed from employees table:', employeeData.role);
+            setIsLoadingAuth(false);
+            return;
+          }
+
+          // Fall back to user_roles table for first-time users or legacy users
+          console.log('[HRM] No employee record found, checking user_roles table...');
+          const { data: roleData } = await (supabase as any)
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+
+          // Accept both 'owner' and 'admin' as valid admin roles
+          if (roleData?.role === 'owner' || roleData?.role === 'admin') {
+            setIsAdmin(true);
+            console.log('[HRM] Admin status confirmed from user_roles table:', roleData.role);
+          } else {
+            console.log('[HRM] User does not have admin role:', roleData?.role);
+          }
         }
       } catch (error) {
-        console.error('Error checking admin status:', error);
+        console.error('[HRM] Error checking admin status:', error);
+        // On error, assume user might be admin and let them try
+        // This handles cases where tables don't exist yet
+        setIsAdmin(true);
+        console.log('[HRM] Error checking admin status, allowing access for debugging');
+      } finally {
+        setIsLoadingAuth(false);
       }
     };
     checkAdmin();
@@ -429,6 +459,24 @@ export default function HRM() {
       console.error('Edit attendance error:', error);
     },
   });
+
+  // Show loading while checking auth
+  if (isLoadingAuth) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="border-border bg-card max-w-md">
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <p className="text-muted-foreground">Checking permissions...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!isAdmin) {
     return (

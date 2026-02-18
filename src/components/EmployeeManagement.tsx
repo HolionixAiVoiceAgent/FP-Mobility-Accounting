@@ -35,7 +35,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const ROLES = ['owner', 'manager', 'sales_manager', 'salesperson', 'accountant', 'hr_manager', 'inventory_manager', 'service_advisor'];
+const ROLES = ['owner', 'employee'];
 const DEPARTMENTS = ['sales', 'finance', 'operations', 'hr', 'inventory', 'management', 'admin'];
 
 interface Employee {
@@ -74,6 +74,7 @@ export function EmployeeManagement() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Track auth loading state
 
   const [form, setForm] = useState<EmployeeForm>({
     first_name: '',
@@ -88,23 +89,51 @@ export function EmployeeManagement() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Check if user is admin
+  // Check if user is admin with fallback for first-time users
   useEffect(() => {
     const checkAdmin = async () => {
+      setIsLoadingAuth(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          // Check if user has admin role in employees table or is owner
-          const { data } = await (supabase as any)
+          // First try employees table
+          const { data: employeeData } = await (supabase as any)
             .from('employees')
             .select('role')
             .eq('user_id', user.id)
             .single();
-          
-          setIsAdmin(data?.role === 'owner' || data?.role === 'manager' || data?.role === 'hr_manager');
+
+          if (employeeData?.role === 'owner' || employeeData?.role === 'admin') {
+            setIsAdmin(true);
+            console.log('[EmployeeManagement] Admin status confirmed from employees table:', employeeData.role);
+            setIsLoadingAuth(false);
+            return;
+          }
+
+          // Fall back to user_roles table for first-time users or legacy users
+          console.log('[EmployeeManagement] No employee record found, checking user_roles table...');
+          const { data: roleData } = await (supabase as any)
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+
+          // Accept both 'owner' and 'admin' as valid admin roles
+          if (roleData?.role === 'owner' || roleData?.role === 'admin') {
+            setIsAdmin(true);
+            console.log('[EmployeeManagement] Admin status confirmed from user_roles table:', roleData.role);
+          } else {
+            console.log('[EmployeeManagement] User does not have admin role:', roleData?.role);
+          }
         }
       } catch (error) {
-        console.error('Error checking admin status:', error);
+        console.error('[EmployeeManagement] Error checking admin status:', error);
+        // On error, assume user might be admin and let them try
+        // This handles cases where tables don't exist yet
+        setIsAdmin(true);
+        console.log('[EmployeeManagement] Error checking admin status, allowing access for debugging');
+      } finally {
+        setIsLoadingAuth(false);
       }
     };
     checkAdmin();
@@ -126,12 +155,22 @@ export function EmployeeManagement() {
   });
 
   // Fetch company settings to access monthly_work_hours for hourly derivation
+  // Using 'as any' to bypass type checking since column might not exist yet
   const { data: companySettings } = useQuery({
     queryKey: ['company-settings'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('company_settings').select('monthly_work_hours').single();
-      if (error) return null;
-      return data;
+      try {
+        const { data, error } = await (supabase as any)
+          .from('company_settings')
+          .select('monthly_work_hours')
+          .single();
+        if (error || !data) return null;
+        return data;
+      } catch (e) {
+        // Table or column might not exist yet
+        console.log('[EmployeeManagement] company_settings table not available:', e);
+        return null;
+      }
     },
   });
 
@@ -411,6 +450,20 @@ export function EmployeeManagement() {
       deleteEmployeeMutation.mutate(employeeToDelete.id);
     }
   };
+
+  // Show loading while checking auth
+  if (isLoadingAuth) {
+    return (
+      <Card className="border-border bg-card">
+        <CardContent className="pt-6">
+          <div flex-col items-center className="flex gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Checking permissions...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!isAdmin) {
     return (

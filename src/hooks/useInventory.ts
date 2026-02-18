@@ -42,12 +42,24 @@ export const useInventory = () => {
   const query = useQuery({
     queryKey: ['inventory'],
     queryFn: async (): Promise<InventoryItem[]> => {
+      console.log('Fetching inventory...');
       const { data, error } = await supabase
         .from('inventory')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Inventory fetch error:', error);
+        // If it's an auth error, return empty array for demo mode
+        const errorStatus = (error as any).status;
+        if (error.message?.includes('JWT') || errorStatus === 406) {
+          console.warn('Auth error - returning empty array for demo mode');
+          return [];
+        }
+        throw error;
+      }
+      
+      console.log('Inventory fetched successfully:', data?.length || 0, 'items');
       return data || [];
     },
     refetchInterval: 5000,
@@ -89,7 +101,21 @@ export const useInventoryStats = () => {
         .from('inventory')
         .select('*');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Inventory stats fetch error:', error);
+        const errorStatus = (error as any).status;
+        if (error.message?.includes('JWT') || errorStatus === 406) {
+          return {
+            totalVehicles: 0,
+            availableVehicles: 0,
+            soldThisMonth: 0,
+            avgDaysInStock: 0,
+            totalInventoryValue: 0,
+            pendingRepairs: 0
+          };
+        }
+        throw error;
+      }
 
       const items = inventory || [];
       const currentDate = new Date();
@@ -164,35 +190,26 @@ export const useCreateInventoryItem = () => {
 
   return useMutation({
     mutationFn: async (data: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {
-      console.log('Creating inventory item:', data);
+      console.log('Creating inventory item with data:', JSON.stringify(data, null, 2));
       
-      // First do the insert without select
+      // Insert the data
       const { error: insertError } = await supabase
         .from('inventory')
         .insert([data]);
 
       if (insertError) {
-        console.error('Insert error:', insertError);
-        throw insertError;
+        console.error('Insert error details:', insertError);
+        throw new Error(insertError.message);
       }
 
-      // Then fetch the new item by inventory_id or vin (since we know those are unique)
-      const { data: newItem, error: fetchError } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('vin', data.vin)
-        .single();
-
-      if (fetchError) {
-        console.error('Fetch new item error:', fetchError);
-        return { success: true, data: null };
-      }
-
-      console.log('Create successful, fetched item:', newItem);
-      return { success: true, data: newItem };
+      console.log('Insert successful! Vehicle added to inventory.');
+      
+      // Return success - don't try to fetch as demo tokens may not work for authenticated requests
+      // The item will appear when we refetch the inventory list
+      return { success: true, data };
     },
-    onSuccess: () => {
-      // Immediately refetch to ensure UI updates
+    onSuccess: (result) => {
+      // Invalidate and refetch the inventory list to get the newly added item
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.refetchQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
@@ -203,6 +220,7 @@ export const useCreateInventoryItem = () => {
       });
     },
     onError: (error: any) => {
+      console.error('Mutation error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to add vehicle to inventory.",

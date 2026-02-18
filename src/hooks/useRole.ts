@@ -2,16 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
+// Support 'owner', 'admin', and 'employee' roles
 export type UserRole = 
   | 'owner' 
-  | 'sales_manager' 
-  | 'salesperson' 
-  | 'accountant' 
-  | 'hr_manager' 
-  | 'inventory_manager' 
-  | 'customer'
   | 'admin'
-  | 'employee'
+  | 'employee' 
   | null;
 
 export interface UserRoleData {
@@ -27,53 +22,78 @@ export interface UserRoleData {
  * Works with both legacy user_roles table and new employees table
  * After deploying Phase 1 database migration, this will fetch from employees table
  */
+// Demo user IDs for detection
+const DEMO_USER_IDS = ['demo-admin-id', 'demo-employee-id', 'demo-fallback-id'];
+
 export const useRole = () => {
   const { user, loading: authLoading, role: legacyRole } = useAuth();
   const [roleData, setRoleData] = useState<UserRoleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Check if user is a demo user by their ID (use the userId directly in fetch to avoid stale closure)
+  const isDemoUser = user ? DEMO_USER_IDS.includes(user.id) : false;
+
   const fetchUserRole = useCallback(async (userId: string) => {
     try {
       setLoading(true);
       setError(null);
+      console.log('[useRole] Fetching role for userId:', userId);
 
-      // Try to fetch from new employees table (after Phase 1 deployment)
-      // For now, fall back to legacy user_roles table
+      // Check if this is a demo user by ID directly
+      const userIsDemoUser = DEMO_USER_IDS.includes(userId);
+      console.log('[useRole] Is demo user:', userIsDemoUser);
+
+      // If in demo mode (demo user ID), use the legacy role directly without querying database
+      if (userIsDemoUser) {
+        console.log('[useRole] Using demo mode with role:', legacyRole || 'owner');
+        setRoleData({
+          user_id: userId,
+          role: legacyRole || 'owner',
+          is_active: true,
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Try to fetch from user_roles table (for real Supabase users)
+      console.log('[useRole] Querying user_roles table...');
       const { data: employeeData, error: employeeError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
         .single();
 
+      console.log('[useRole] Query result:', { employeeData, employeeError });
+
       if (employeeData) {
         const role = employeeData.role as UserRole;
         setRoleData({
           user_id: userId,
-          role: role || legacyRole || 'customer',
+          role: role || legacyRole || 'employee',
           is_active: true,
         });
       } else if (!employeeError) {
         // Fallback to legacy role from useAuth
         setRoleData({
           user_id: userId,
-          role: legacyRole || 'customer',
+          role: legacyRole || 'employee',
           is_active: true,
         });
       } else {
-        // No role found, default to customer
+        // No role found, default to employee
         setRoleData({
           user_id: userId,
-          role: 'customer',
+          role: 'employee',
           is_active: true,
         });
       }
     } catch (err) {
-      console.error('Error fetching user role:', err);
+      console.error('[useRole] Error fetching user role:', err);
       // Fallback to legacy role
       setRoleData({
         user_id: userId,
-        role: legacyRole || 'customer',
+        role: legacyRole || 'employee',
         is_active: true,
       });
     } finally {
@@ -97,12 +117,8 @@ export const useRole = () => {
   }, [roleData]);
 
   const isOwner = useCallback(() => hasRole('owner'), [hasRole]);
-  const isSalesManager = useCallback(() => hasRole('sales_manager'), [hasRole]);
-  const isSalesperson = useCallback(() => hasRole('salesperson'), [hasRole]);
-  const isAccountant = useCallback(() => hasRole('accountant'), [hasRole]);
-  const isHRManager = useCallback(() => hasRole('hr_manager'), [hasRole]);
-  const isInventoryManager = useCallback(() => hasRole('inventory_manager'), [hasRole]);
-  const isCustomer = useCallback(() => hasRole('customer'), [hasRole]);
+  const isAdmin = useCallback(() => hasRole(['owner', 'admin']), [hasRole]);
+  const isEmployee = useCallback(() => hasRole('employee'), [hasRole]);
 
   return {
     user,
@@ -116,14 +132,11 @@ export const useRole = () => {
     // Role checkers
     hasRole,
     isOwner,
-    isSalesManager,
-    isSalesperson,
-    isAccountant,
-    isHRManager,
-    isInventoryManager,
-    isCustomer,
+    isAdmin,
+    isEmployee,
     
     // Utility
     refetch: () => user && fetchUserRole(user.id),
   };
 };
+

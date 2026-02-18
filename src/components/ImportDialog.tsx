@@ -9,6 +9,51 @@ import Papa from 'papaparse';
 import { supabase } from "@/integrations/supabase/client";
 import { generateExpenseCSVTemplate, validateExpenseCSV } from '@/utils/csvTemplates';
 
+// CSV Template generator for inventory
+const generateInventoryCSVTemplate = () => {
+  const templateData = [
+    {
+      inventory_id: "INV2024001",
+      vin: "WBA3A5G50FNS12345",
+      make: "BMW",
+      model: "320i",
+      year: "2023",
+      mileage: "25000",
+      color: "Schwarz Metallic",
+      purchase_price: "22000",
+      expected_sale_price: "28500",
+      status: "available",
+      location: "Lot A-12",
+      notes: "Excellent condition"
+    },
+    {
+      inventory_id: "INV2024002",
+      vin: "WAUZZZ8V5NA123456",
+      make: "Audi",
+      model: "A4",
+      year: "2022",
+      mileage: "45000",
+      color: "Weiß",
+      purchase_price: "28000",
+      expected_sale_price: "35000",
+      status: "available",
+      location: "Lot B-05",
+      notes: "Full service history"
+    }
+  ];
+
+  const csv = Papa.unparse(templateData);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'inventory_template.csv');
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 interface ImportDialogProps {
   type: 'inventory' | 'customers' | 'expenses' | 'sales';
   onImportComplete: () => void;
@@ -177,10 +222,10 @@ export function ImportDialog({ type, onImportComplete }: ImportDialogProps) {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          {type === 'expenses' && (
+          {(type === 'expenses' || type === 'inventory') && (
             <Button
               variant="outline"
-              onClick={generateExpenseCSVTemplate}
+              onClick={type === 'inventory' ? generateInventoryCSVTemplate : generateExpenseCSVTemplate}
               className="w-full"
             >
               <Download className="h-4 w-4 mr-2" />

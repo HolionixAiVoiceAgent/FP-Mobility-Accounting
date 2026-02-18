@@ -3,21 +3,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useCashSummary } from '@/hooks/useCashSummary';
 import { Download } from 'lucide-react';
-import { exportToCSV } from '@/utils/exportUtils';
+import { exportToExcel } from '@/utils/exportUtils';
 
 export function CashSummaryCard() {
   const { data = [], isLoading } = useCashSummary();
 
   const handleExport = () => {
     const rows = (data || []).map(d => ({
-      employee_id: d.employee_id,
-      employee: d.full_name,
-      total_advanced: Number(d.total_advanced).toFixed(2),
-      total_spent: Number(d.total_spent).toFixed(2),
-      remaining: Number(d.remaining).toFixed(2)
+      'Employee ID': d.employee_id,
+      'Employee Name': d.full_name,
+      'Total Advanced (€)': Number(d.total_advanced),
+      'Total Spent (€)': Number(d.total_spent),
+      'Remaining (€)': Number(d.remaining)
     }));
 
-    exportToCSV(rows, `cash_summary_${new Date().toISOString().split('T')[0]}.csv`);
+    exportToExcel(rows, `cash_summary_${new Date().toISOString().split('T')[0]}`);
   };
 
   return (

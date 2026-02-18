@@ -29,7 +29,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { ImportDialog } from '@/components/ImportDialog';
 import { BulkDeleteDialog } from '@/components/BulkDeleteDialog';
-import { exportExpensesToCSV } from '@/utils/exportUtils';
+import { exportExpensesToExcel } from '@/utils/exportUtils';
 
 const categoryColors = [
   "bg-blue-500",
@@ -123,10 +123,10 @@ export default function Expenses() {
       });
       return;
     }
-    await exportExpensesToCSV(expenses);
+    await exportExpensesToExcel(expenses);
     toast({
       title: "Export Successful",
-      description: "Expenses data has been exported to CSV.",
+      description: "Expenses data has been exported to Excel.",
     });
   };
 

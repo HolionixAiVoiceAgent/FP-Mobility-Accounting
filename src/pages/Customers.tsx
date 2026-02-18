@@ -25,7 +25,7 @@ import { useState } from 'react';
 import { DeleteDialog } from '@/components/DeleteDialog';
 import { ImportDialog } from '@/components/ImportDialog';
 import { BulkDeleteDialog } from '@/components/BulkDeleteDialog';
-import { exportCustomersToCSV } from '@/utils/exportUtils';
+import { exportCustomersToExcel } from '@/utils/exportUtils';
 
 
 export default function Customers() {
@@ -54,7 +54,7 @@ export default function Customers() {
   });
 
   const exportCustomers = () => {
-    exportCustomersToCSV(filteredCustomers);
+    exportCustomersToExcel(filteredCustomers);
   };
 
   if (loading) {

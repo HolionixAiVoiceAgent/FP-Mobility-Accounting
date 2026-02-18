@@ -18,7 +18,7 @@ import {
 import { useState } from 'react';
 import { useVehicleSales, useVehicleSalesStats } from '@/hooks/useVehicleSales';
 import { AddSaleDialog } from '@/components/AddSaleDialog';
-import { exportVehicleSalesToCSV } from '@/utils/exportUtils';
+import { exportVehicleSalesToExcel } from '@/utils/exportUtils';
 import { useToast } from '@/hooks/use-toast';
 import { CustomerDetailsDialog } from '@/components/CustomerDetailsDialog';
 import { ImportDialog } from '@/components/ImportDialog';
@@ -42,10 +42,10 @@ export default function VehicleSales() {
       });
       return;
     }
-    exportVehicleSalesToCSV(vehicleSales);
+    exportVehicleSalesToExcel(vehicleSales);
     toast({
       title: "Export Successful",
-      description: "Sales data has been exported to CSV.",
+      description: "Sales data has been exported to Excel.",
     });
   };
 
