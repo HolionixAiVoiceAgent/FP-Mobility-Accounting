@@ -35,8 +35,7 @@ export const useVehicleSales = () => {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000, // Cache data for 30 seconds - real-time subscription will handle updates
   });
 
   // Set up real-time subscription
@@ -78,12 +77,16 @@ export const useVehicleSalesStats = () => {
       const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
       const endOfMonth = new Date(currentYear, currentMonth, 0);
       
+      // Use date strings for DATE column comparisons
+      const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+      const endOfMonthStr = endOfMonth.toISOString().split('T')[0];
+      
       // Fetch sales data with proper date filtering at database level
       const { data: salesThisMonth, error: currentMonthError } = await supabase
         .from('vehicle_sales')
         .select('sale_price, payment_status')
-        .gte('sale_date', startOfMonth.toISOString())
-        .lte('sale_date', endOfMonth.toISOString());
+        .gte('sale_date', startOfMonthStr)
+        .lte('sale_date', endOfMonthStr);
 
       const { data: allSales, error: allSalesError } = await supabase
         .from('vehicle_sales')
@@ -108,8 +111,7 @@ export const useVehicleSalesStats = () => {
         pendingPayments
       };
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000, // Cache data for 30 seconds - real-time subscription will handle updates
   });
 
   // Set up real-time subscription

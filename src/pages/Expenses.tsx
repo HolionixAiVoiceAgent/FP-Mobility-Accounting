@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Receipt, 
   Plus, 
@@ -108,11 +109,150 @@ const monthlyStats = {
 };
 
 export default function Expenses() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
   const { data: expenses = [], isLoading } = useExpenses();
   const { data: stats } = useExpenseStats();
   const [employeesMap, setEmployeesMap] = useState<Record<string, string>>({});
+
+  // Quick Add Expense Form State
+  const [quickAddData, setQuickAddData] = useState({
+    amount: '',
+    category: 'Office Rent',
+    vendor: '',
+    date: new Date().toISOString().split('T')[0],
+    description: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Quick Add Expense Handler
+  const handleQuickAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!quickAddData.amount || parseFloat(quickAddData.amount) <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid amount.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!quickAddData.category) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a category.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const expenseData = {
+        expense_id: `EXP-${Date.now()}`,
+        category: quickAddData.category,
+        description: quickAddData.description || `${quickAddData.category} expense`,
+        amount: parseFloat(quickAddData.amount),
+        vendor: quickAddData.vendor || null,
+        date: quickAddData.date,
+        tax_deductible: true,
+        vehicle_id: null,
+        receipt_url: null,
+        payment_type: 'account' as const,
+        employee_id: null
+      };
+
+      const { error } = await supabase
+        .from('expenses')
+        .insert([expenseData]);
+
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
+
+      toast({
+        title: "Expense Added",
+        description: `€${parseFloat(quickAddData.amount).toFixed(2)} - ${quickAddData.category} has been added.`,
+      });
+
+      // Reset form
+      setQuickAddData({
+        amount: '',
+        category: 'Office Rent',
+        vendor: '',
+        date: new Date().toISOString().split('T')[0],
+        description: ''
+      });
+
+    } catch (error) {
+      console.error('Error adding expense:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add expense. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Save as Template Handler
+  const handleSaveAsTemplate = () => {
+    if (!quickAddData.category) {
+      toast({
+        title: "No Data",
+        description: "Please fill in the category before saving as template.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const template = {
+      category: quickAddData.category,
+      vendor: quickAddData.vendor,
+      description: quickAddData.description
+    };
+
+    // Get existing templates
+    const existingTemplates = JSON.parse(localStorage.getItem('expenseTemplates') || '[]');
+    
+    // Add new template
+    const newTemplates = [...existingTemplates, { ...template, createdAt: new Date().toISOString() }];
+    localStorage.setItem('expenseTemplates', JSON.stringify(newTemplates));
+
+    toast({
+      title: "Template Saved",
+      description: `Template for "${quickAddData.category}" has been saved.`,
+    });
+  };
+
+  // Load Template Handler
+  const handleLoadTemplate = (template: any) => {
+    setQuickAddData({
+      ...quickAddData,
+      category: template.category,
+      vendor: template.vendor || '',
+      description: template.description || ''
+    });
+    toast({
+      title: "Template Loaded",
+      description: `Template for "${template.category}" has been loaded.`,
+    });
+  };
+
+  // Function to refresh data without page reload
+  const handleRefreshData = () => {
+    queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    queryClient.invalidateQueries({ queryKey: ['expense-stats'] });
+  };
 
   const handleExportExpenses = async () => {
     if (expenses.length === 0) {
@@ -174,8 +314,8 @@ export default function Expenses() {
             <p className="text-muted-foreground">Track and categorize business expenses</p>
           </div>
           <div className="flex items-center space-x-3">
-            <BulkDeleteDialog type="expenses" onDeleteComplete={() => window.location.reload()} />
-            <ImportDialog type="expenses" onImportComplete={() => window.location.reload()} />
+            <BulkDeleteDialog type="expenses" onDeleteComplete={handleRefreshData} />
+            <ImportDialog type="expenses" onImportComplete={handleRefreshData} />
             <Button variant="outline" onClick={handleExportExpenses}>
               <Download className="h-4 w-4 mr-2" />
               Export Expenses
@@ -279,42 +419,75 @@ export default function Expenses() {
             <CardTitle>Quick Add Expense</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="space-y-2">
-                <Label htmlFor="expense-amount">Amount (€)</Label>
-                <Input id="expense-amount" type="number" placeholder="0.00" />
+            <form onSubmit={handleQuickAddExpense}>
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="space-y-2">
+                  <Label htmlFor="expense-amount">Amount (€)</Label>
+                  <Input 
+                    id="expense-amount" 
+                    type="number" 
+                    placeholder="0.00" 
+                    value={quickAddData.amount}
+                    onChange={(e) => setQuickAddData({...quickAddData, amount: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expense-category">Category</Label>
+                  <select 
+                    className="w-full px-3 py-2 border border-input rounded-md bg-background"
+                    value={quickAddData.category}
+                    onChange={(e) => setQuickAddData({...quickAddData, category: e.target.value})}
+                  >
+                    <option value="Office Rent">Office Rent</option>
+                    <option value="Vehicle Insurance">Vehicle Insurance</option>
+                    <option value="Staff Salaries">Staff Salaries</option>
+                    <option value="Fuel & Utilities">Fuel & Utilities</option>
+                    <option value="Parts & Supplies">Parts & Supplies</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Repairs & Maintenance">Repairs & Maintenance</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expense-vendor">Vendor</Label>
+                  <Input 
+                    id="expense-vendor" 
+                    placeholder="Enter vendor name" 
+                    value={quickAddData.vendor}
+                    onChange={(e) => setQuickAddData({...quickAddData, vendor: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expense-date">Date</Label>
+                  <Input 
+                    id="expense-date" 
+                    type="date" 
+                    value={quickAddData.date}
+                    onChange={(e) => setQuickAddData({...quickAddData, date: e.target.value})}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="expense-category">Category</Label>
-                <select className="w-full px-3 py-2 border border-input rounded-md bg-background">
-                  <option>Office Rent</option>
-                  <option>Vehicle Insurance</option>
-                  <option>Staff Salaries</option>
-                  <option>Fuel & Utilities</option>
-                  <option>Parts & Supplies</option>
-                  <option>Marketing</option>
-                  <option>Other</option>
-                </select>
+              <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="expense-description">Description</Label>
+                  <Input 
+                    id="expense-description" 
+                    placeholder="Enter expense description" 
+                    value={quickAddData.description}
+                    onChange={(e) => setQuickAddData({...quickAddData, description: e.target.value})}
+                  />
+                </div>
+                <div className="flex space-x-2">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Adding...' : 'Add Expense'}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleSaveAsTemplate}>
+                    Save as Template
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="expense-vendor">Vendor</Label>
-                <Input id="expense-vendor" placeholder="Enter vendor name" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="expense-date">Date</Label>
-                <Input id="expense-date" type="date" />
-              </div>
-            </div>
-            <div className="mt-4 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="expense-description">Description</Label>
-                <Input id="expense-description" placeholder="Enter expense description" />
-              </div>
-              <div className="flex space-x-2">
-                <Button>Add Expense</Button>
-                <Button variant="outline">Save as Template</Button>
-              </div>
-            </div>
+            </form>
           </CardContent>
         </Card>
 
@@ -397,7 +570,7 @@ export default function Expenses() {
                           id={expense.id} 
                           table="expenses" 
                           itemName={expense.description}
-                          onDeleteComplete={() => window.location.reload()}
+                          onDeleteComplete={handleRefreshData}
                         />
                         {expense.receipt_url ? (
                           <Button 

@@ -26,8 +26,7 @@ export const useCashSummary = () => {
       if (error) throw error;
       return (data || []) as CashSummary[];
     },
-    refetchInterval: 5000,
-    staleTime: 2000,
+    staleTime: 30000,
   });
 
   // Subscribe to changes on expenses and employee_cash_advances to keep summary realtime

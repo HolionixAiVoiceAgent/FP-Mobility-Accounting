@@ -52,24 +52,43 @@ interface Sale {
 }
 
 const fetchCompanySettings = async (): Promise<CompanySettings> => {
-  const { data, error } = await supabase
-    .from('company_settings')
-    .select('*')
-    .limit(1)
-    .single();
+  try {
+    // Try to fetch company settings with .single() to get a single record
+    const { data, error } = await supabase
+      .from('company_settings')
+      .select('*')
+      .limit(1)
+      .single();
 
-  if (error) throw error;
-  
-  return {
-    company_name: data?.company_name || 'FP Mobility GmbH',
-    address: data?.address,
-    phone: data?.phone,
-    email: data?.email,
-    tax_id: data?.tax_id,
-    vat_rate: data?.vat_rate || 19,
-    currency: data?.currency || 'EUR',
-    logo_url: data?.logo_url
-  };
+    if (error) {
+      // Handle case where no settings exist or RLS blocks access
+      console.warn('Could not fetch company settings:', error.message);
+      return {
+        company_name: 'FP Mobility GmbH',
+        vat_rate: 19,
+        currency: 'EUR'
+      };
+    }
+    
+    return {
+      company_name: data?.company_name || 'FP Mobility GmbH',
+      address: data?.address,
+      phone: data?.phone,
+      email: data?.email,
+      tax_id: data?.tax_id,
+      vat_rate: data?.vat_rate || 19,
+      currency: data?.currency || 'EUR',
+      logo_url: data?.logo_url,
+      bank_account: data?.bank_account
+    };
+  } catch (err) {
+    console.warn('Error fetching company settings, using defaults:', err);
+    return {
+      company_name: 'FP Mobility GmbH',
+      vat_rate: 19,
+      currency: 'EUR'
+    };
+  }
 };
 
 export const generateQuotationPDF = async (quotationData: QuotationData) => {

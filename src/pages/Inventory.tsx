@@ -273,6 +273,16 @@ export default function Inventory() {
             <div className="space-y-4">
               {filteredInventory.map((vehicle) => {
                 const daysInStock = calculateDaysInStock(vehicle.purchase_date, vehicle.sale_date);
+                console.log('Rendering vehicle:', { 
+                  id: vehicle.id, 
+                  inventory_id: vehicle.inventory_id,
+                  purchase_date: vehicle.purchase_date,
+                  sale_date: vehicle.sale_date,
+                  daysInStock,
+                  tuv_expiry: vehicle.tuv_expiry,
+                  last_service_date: vehicle.last_service_date,
+                  images_count: vehicle.images_count
+                });
                 return (
                   <div key={vehicle.id} className="border border-border rounded-lg p-6 hover:bg-accent transition-colors">
                     <div className="flex items-center justify-between mb-4">
@@ -383,7 +393,7 @@ export default function Inventory() {
           />
           <VehicleImagesDialog
             inventoryId={selectedVehicle}
-            vehicleName={inventory.find(v => v.id === selectedVehicle)?.make + ' ' + inventory.find(v => v.id === selectedVehicle)?.model || 'Vehicle'}
+            vehicleName={inventory.find(v => v.inventory_id === selectedVehicle)?.make + ' ' + inventory.find(v => v.inventory_id === selectedVehicle)?.model || 'Vehicle'}
             open={imagesDialogOpen}
             onOpenChange={setImagesDialogOpen}
           />

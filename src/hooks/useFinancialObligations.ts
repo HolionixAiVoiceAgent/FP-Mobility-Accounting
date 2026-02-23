@@ -35,8 +35,7 @@ export const useFinancialObligations = () => {
       if (error) throw error;
       return data as FinancialObligation[];
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000,
   });
 
   // Set up real-time subscription

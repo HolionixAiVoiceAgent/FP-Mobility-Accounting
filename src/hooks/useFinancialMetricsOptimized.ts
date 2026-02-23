@@ -31,17 +31,16 @@ export function useFinancialMetricsOptimized() {
       const currentMonth = now.getMonth() + 1;
       const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
       
-      // Calculate date range for last 12 months
+      // Calculate date range for last 12 months (use date strings for DATE columns)
       const startDate = new Date(now);
       startDate.setMonth(startDate.getMonth() - 12);
-      const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
-      const endOfMonth = new Date(currentYear, currentMonth, 0);
-
+      const startDateStr = startDate.toISOString().split('T')[0];
+      
       // Fetch sales data with proper date filtering
       const { data: sales, error: salesError } = await supabase
         .from('vehicle_sales')
         .select('sale_price, purchase_price, sale_date')
-        .gte('sale_date', startDate.toISOString());
+        .gte('sale_date', startDateStr);
 
       if (salesError) throw salesError;
 
@@ -49,7 +48,7 @@ export function useFinancialMetricsOptimized() {
       const { data: expenses, error: expensesError } = await supabase
         .from('expenses')
         .select('amount, date')
-        .gte('date', startDate.toISOString());
+        .gte('date', startDateStr);
 
       if (expensesError) throw expensesError;
 

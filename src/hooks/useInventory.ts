@@ -38,11 +38,14 @@ export interface InventoryStats {
 
 export const useInventory = () => {
   const subscriptionRef = useRef<any>(null);
+  const imageSubscriptionRef = useRef<any>(null);
 
   const query = useQuery({
     queryKey: ['inventory'],
     queryFn: async (): Promise<InventoryItem[]> => {
       console.log('Fetching inventory...');
+      
+      // Fetch inventory items
       const { data, error } = await supabase
         .from('inventory')
         .select('*')
@@ -59,11 +62,46 @@ export const useInventory = () => {
         throw error;
       }
       
-      console.log('Inventory fetched successfully:', data?.length || 0, 'items');
-      return data || [];
+      console.log('Inventory fetch raw response:', { data, count: data?.length });
+      
+      // Fetch actual image counts from vehicle_images table
+      const { data: vehicleImages, error: imagesError } = await supabase
+        .from('vehicle_images')
+        .select('inventory_id');
+      
+      if (imagesError) {
+        console.warn('Could not fetch vehicle images:', imagesError);
+      }
+      
+      // Create a count map of images per inventory_id
+      const imageCountMap = new Map<string, number>();
+      if (vehicleImages) {
+        vehicleImages.forEach((img) => {
+          const count = imageCountMap.get(img.inventory_id) || 0;
+          imageCountMap.set(img.inventory_id, count + 1);
+        });
+      }
+      
+      // Map image counts to inventory items (using both inventory_id and vin as fallback)
+      const inventoryWithImages = (data || []).map(item => ({
+        ...item,
+        images_count: imageCountMap.get(item.inventory_id) || imageCountMap.get(item.vin) || 0
+      }));
+      
+      console.log('Inventory with image counts:', inventoryWithImages.map(i => ({ 
+        inventory_id: i.inventory_id, 
+        vin: i.vin, 
+        images_count: i.images_count 
+      })));
+      
+      if (data && data.length > 0) {
+        console.log('First vehicle data:', JSON.stringify(data[0], null, 2));
+      }
+      return inventoryWithImages;
     },
-    refetchInterval: 5000,
-    staleTime: 2000,
+    staleTime: 10000, // Cache data for 10 seconds
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   useEffect(() => {
@@ -80,10 +118,28 @@ export const useInventory = () => {
 
     subscriptionRef.current = subscription;
 
+    // Also subscribe to vehicle_images changes to update image counts
+    const imageSubscription = supabase
+      .channel('vehicle_images_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vehicle_images' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    imageSubscriptionRef.current = imageSubscription;
+
     return () => {
       if (subscriptionRef.current) {
         supabase.removeChannel(subscriptionRef.current);
         subscriptionRef.current = null;
+      }
+      if (imageSubscriptionRef.current) {
+        supabase.removeChannel(imageSubscriptionRef.current);
+        imageSubscriptionRef.current = null;
       }
     };
   }, [query]);
@@ -155,8 +211,9 @@ export const useInventoryStats = () => {
         pendingRepairs
       };
     },
-    refetchInterval: 5000,
-    staleTime: 2000,
+    staleTime: 10000, // Cache data for 10 seconds
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   useEffect(() => {
@@ -211,9 +268,7 @@ export const useCreateInventoryItem = () => {
     onSuccess: (result) => {
       // Invalidate and refetch the inventory list to get the newly added item
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.refetchQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
-      queryClient.refetchQueries({ queryKey: ['inventory-stats'] });
       toast({
         title: "Success",
         description: "Vehicle added to inventory successfully.",
@@ -275,11 +330,9 @@ export const useUpdateInventoryItem = () => {
           );
         });
       }
-      // Then refetch to ensure data consistency
+      // Invalidate to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.refetchQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
-      queryClient.refetchQueries({ queryKey: ['inventory-stats'] });
       toast({
         title: "Success",
         description: "Vehicle updated successfully.",

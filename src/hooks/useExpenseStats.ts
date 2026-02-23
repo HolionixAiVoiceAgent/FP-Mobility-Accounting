@@ -33,14 +33,13 @@ export const useExpenses = () => {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000,
   });
 
   // Set up real-time subscription
   useEffect(() => {
     const subscription = supabase
-      .channel('expenses_updates')
+      .channel('expenses_stats_updates')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'expenses' },
@@ -76,18 +75,22 @@ export const useExpenseStats = () => {
       const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
       const endOfMonth = new Date(currentYear, currentMonth, 0);
       
+      // Use date strings for DATE column comparisons
+      const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
+      const endOfMonthStr = endOfMonth.toISOString().split('T')[0];
+      
       // Fetch aggregated data from database using proper grouping
       const { data: categoryData, error: categoryError } = await supabase
         .from('expenses')
         .select('category, amount')
-        .gte('date', startOfMonth.toISOString())
-        .lte('date', endOfMonth.toISOString());
+        .gte('date', startOfMonthStr)
+        .lte('date', endOfMonthStr);
 
       const { data: totalData, error: totalError } = await supabase
         .from('expenses')
         .select('amount')
-        .gte('date', startOfMonth.toISOString())
-        .lte('date', endOfMonth.toISOString());
+        .gte('date', startOfMonthStr)
+        .lte('date', endOfMonthStr);
 
       if (categoryError || totalError) throw categoryError || totalError;
 
@@ -124,8 +127,7 @@ export const useExpenseStats = () => {
         categoryBreakdown
       };
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000,
   });
 
   // Set up real-time subscription

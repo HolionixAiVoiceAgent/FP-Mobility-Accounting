@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+   import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth, DEMO_CREDENTIALS } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -86,12 +86,6 @@ export default function Auth() {
     console.log('[Auth] Filled employee demo credentials');
   };
 
-  const fillDemoFallback = () => {
-    setEmail(DEMO_CREDENTIALS.fallback.email);
-    setPassword(DEMO_CREDENTIALS.fallback.password);
-    console.log('[Auth] Filled fallback demo credentials');
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -122,14 +116,6 @@ export default function Auth() {
                 className="text-xs"
               >
                 👤 Employee Demo
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={fillDemoFallback}
-                className="text-xs"
-              >
-                🔄 Fallback Demo
               </Button>
             </div>
           </div>

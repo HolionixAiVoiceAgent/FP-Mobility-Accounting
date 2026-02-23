@@ -143,6 +143,21 @@ CREATE POLICY "All users can delete expenses"
   USING (true);
 
 -- ============================================================================
+-- MIGRATION 6: Fix Financial Obligations RLS Policies
+-- ============================================================================
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Financial obligations select policy" ON public.financial_obligations;
+DROP POLICY IF EXISTS "Financial obligations insert policy" ON public.financial_obligations;
+DROP POLICY IF EXISTS "Financial obligations update policy" ON public.financial_obligations;
+DROP POLICY IF EXISTS "Financial obligations delete policy" ON public.financial_obligations;
+
+-- Create permissive RLS policies for demo mode (allow all operations)
+CREATE POLICY "Financial obligations select policy" ON public.financial_obligations FOR SELECT USING (true);
+CREATE POLICY "Financial obligations insert policy" ON public.financial_obligations FOR INSERT WITH CHECK (true);
+CREATE POLICY "Financial obligations update policy" ON public.financial_obligations FOR UPDATE USING (true);
+CREATE POLICY "Financial obligations delete policy" ON public.financial_obligations FOR DELETE USING (true);
+
+-- ============================================================================
 -- DONE! All migrations applied successfully
 -- ============================================================================
 -- Verify setup:

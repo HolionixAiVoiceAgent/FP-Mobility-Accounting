@@ -3,6 +3,7 @@ import { logError } from '@/lib/errors';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   Dialog, 
   DialogContent, 
@@ -69,12 +70,11 @@ interface EmployeeForm {
 export function EmployeeManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdmin, loading: authLoading } = useAuth();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true); // Track auth loading state
 
   const [form, setForm] = useState<EmployeeForm>({
     first_name: '',
@@ -89,55 +89,25 @@ export function EmployeeManagement() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Check if user is admin with fallback for first-time users
+  // Reset form when dialog opens for adding new employee
   useEffect(() => {
-    const checkAdmin = async () => {
-      setIsLoadingAuth(true);
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          // First try employees table
-          const { data: employeeData } = await (supabase as any)
-            .from('employees')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-
-          if (employeeData?.role === 'owner' || employeeData?.role === 'admin') {
-            setIsAdmin(true);
-            console.log('[EmployeeManagement] Admin status confirmed from employees table:', employeeData.role);
-            setIsLoadingAuth(false);
-            return;
-          }
-
-          // Fall back to user_roles table for first-time users or legacy users
-          console.log('[EmployeeManagement] No employee record found, checking user_roles table...');
-          const { data: roleData } = await (supabase as any)
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-
-          // Accept both 'owner' and 'admin' as valid admin roles
-          if (roleData?.role === 'owner' || roleData?.role === 'admin') {
-            setIsAdmin(true);
-            console.log('[EmployeeManagement] Admin status confirmed from user_roles table:', roleData.role);
-          } else {
-            console.log('[EmployeeManagement] User does not have admin role:', roleData?.role);
-          }
-        }
-      } catch (error) {
-        console.error('[EmployeeManagement] Error checking admin status:', error);
-        // On error, assume user might be admin and let them try
-        // This handles cases where tables don't exist yet
-        setIsAdmin(true);
-        console.log('[EmployeeManagement] Error checking admin status, allowing access for debugging');
-      } finally {
-        setIsLoadingAuth(false);
-      }
-    };
-    checkAdmin();
-  }, []);
+    if (!addDialogOpen) {
+      // Dialog closed - form will be reset on next open or by handleEdit
+    } else if (!editingEmployee) {
+      // Dialog opened for adding new employee - reset form
+      setForm({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        role: 'salesperson',
+        position: '',
+        department: 'sales',
+        base_salary: '',
+        hourly_rate: '',
+      });
+    }
+  }, [addDialogOpen, editingEmployee]);
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery({
@@ -452,7 +422,7 @@ export function EmployeeManagement() {
   };
 
   // Show loading while checking auth
-  if (isLoadingAuth) {
+  if (authLoading) {
     return (
       <Card className="border-border bg-card">
         <CardContent className="pt-6">
@@ -487,10 +457,7 @@ export function EmployeeManagement() {
         </div>
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => {
-              resetForm();
-              setEditingEmployee(null);
-            }}>
+            <Button>
               <Plus className="h-4 w-4 mr-2" />
               Add Employee
             </Button>

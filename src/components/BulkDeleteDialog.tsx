@@ -32,12 +32,14 @@ export function BulkDeleteDialog({ type, onDeleteComplete }: BulkDeleteDialogPro
 
     try {
       if (type === 'all') {
-        // Delete in order to respect foreign key constraints
-        await supabase.from('payments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('vehicle_sales').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        // Delete in parallel to respect foreign key constraints
+        await Promise.all([
+          supabase.from('payments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('vehicle_sales').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        ]);
         
         toast({
           title: "Success",

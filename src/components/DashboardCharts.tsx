@@ -8,6 +8,23 @@ interface DashboardChartsProps {
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
+// Custom tooltip component for better display
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-background border border-border p-3 rounded-lg shadow-lg">
+        <p className="font-semibold text-sm mb-1">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: €{Number(entry.value).toLocaleString()}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
+
 export function DashboardCharts({ salesData = [], revenueBySource = [] }: DashboardChartsProps) {
   // Ensure we have data to display - use fallback data if empty
   const displaySalesData = salesData && salesData.length > 0 ? salesData : [];
@@ -40,7 +57,7 @@ export function DashboardCharts({ salesData = [], revenueBySource = [] }: Dashbo
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip formatter={(value) => `€${Number(value).toLocaleString()}`} />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} name="Revenue" />
                 <Line type="monotone" dataKey="expenses" stroke="hsl(var(--destructive))" strokeWidth={2} name="Expenses" />
@@ -69,7 +86,7 @@ export function DashboardCharts({ salesData = [], revenueBySource = [] }: Dashbo
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip formatter={(value) => `€${Number(value).toLocaleString()}`} />
+                <Tooltip content={<CustomTooltip />} />
                 <Legend />
                 <Bar dataKey="profit" fill="hsl(var(--primary))" name="Profit" />
               </BarChart>

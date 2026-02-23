@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { CustomerForm } from '@/components/CustomerForm';
 import { useCustomers } from '@/hooks/useCustomers';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Users, 
   Plus, 
@@ -29,9 +30,21 @@ import { exportCustomersToExcel } from '@/utils/exportUtils';
 
 
 export default function Customers() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const { customers, stats, loading, addCustomer } = useCustomers();
+
+  // Function to refresh data without page reload
+  const handleRefreshData = () => {
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+  };
+
+  // Wrapper for addCustomer to refresh data after adding
+  const handleAddCustomer = async (customerData: any) => {
+    await addCustomer(customerData);
+    handleRefreshData();
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -76,13 +89,13 @@ export default function Customers() {
             <p className="text-muted-foreground">Manage customer relationships and payment tracking</p>
           </div>
           <div className="flex items-center space-x-3">
-            <BulkDeleteDialog type="customers" onDeleteComplete={() => window.location.reload()} />
-            <ImportDialog type="customers" onImportComplete={() => window.location.reload()} />
+            <BulkDeleteDialog type="customers" onDeleteComplete={handleRefreshData} />
+            <ImportDialog type="customers" onImportComplete={handleRefreshData} />
             <Button variant="outline" onClick={exportCustomers}>
               <Download className="h-4 w-4 mr-2" />
               Export Customers
             </Button>
-            <CustomerForm onSubmit={addCustomer} />
+            <CustomerForm onSubmit={handleAddCustomer} />
           </div>
         </div>
 
@@ -237,7 +250,7 @@ export default function Customers() {
                           id={customer.id} 
                           table="customers" 
                           itemName={customer.name}
-                          onDeleteComplete={() => window.location.reload()}
+                          onDeleteComplete={handleRefreshData}
                         />
                         <Button variant="outline" size="sm">
                           <User className="h-4 w-4 mr-2" />

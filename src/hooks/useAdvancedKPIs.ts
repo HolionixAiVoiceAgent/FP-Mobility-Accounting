@@ -39,10 +39,14 @@ export function useAdvancedKPIs() {
         .eq('status', 'available');
 
       // Fetch sales data
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0];
+      
       const { data: sales } = await supabase
         .from('vehicle_sales')
         .select('id, vehicle_make, profit, sale_price, purchase_price, customer_id, created_at, sale_date')
-        .gte('sale_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString());
+        .gte('sale_date', oneYearAgoStr);
 
       // Fetch customers
       const { data: customers } = await supabase

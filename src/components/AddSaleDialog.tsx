@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,7 @@ import { useCustomers } from '@/hooks/useCustomers';
 
 export function AddSaleDialog() {
   const [open, setOpen] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [formData, setFormData] = useState({
     sale_id: '',
     vehicle_make: '',
@@ -33,20 +35,50 @@ export function AddSaleDialog() {
   const { customers = [] } = useCustomers();
   const { toast } = useToast();
 
-  const availableVehicles = inventory.filter(v => v.status === 'available' || v.status === 'reserved');
+  const availableVehicles = inventory.filter(v => 
+    (v.status === 'available' || v.status === 'reserved') && 
+    v.make && 
+    v.model &&
+    v.vin && 
+    v.vin.trim() !== ''
+  );
+
+  // Pre-fetch existing VINs from vehicle_sales to filter out already sold vehicles
+  const { data: existingSales = [], isLoading: isLoadingSales } = useQuery({
+    queryKey: ['vehicle-sales-vins'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vehicle_sales')
+        .select('vin');
+      if (error) {
+        console.error('Error fetching existing sales:', error);
+        return [];
+      }
+      return data || [];
+    }
+  });
+
+  const soldVINs = new Set(existingSales.map(s => s.vin));
+  
+  // Filter out vehicles that are already sold (by VIN or status)
+  const eligibleVehicles = availableVehicles.filter(v => 
+    !soldVINs.has(v.vin) && v.status !== 'sold'
+  );
 
   const handleVehicleSelect = (vehicleId: string) => {
     const vehicle = inventory.find(v => v.id === vehicleId);
     if (vehicle) {
+      console.log('Selected vehicle:', vehicle);
+      setSelectedVehicleId(vehicleId);
       setFormData(prev => ({
         ...prev,
-        vehicle_make: vehicle.make,
-        vehicle_model: vehicle.model,
-        vehicle_year: vehicle.year,
-        vin: vehicle.vin,
-        purchase_price: vehicle.purchase_price,
-        sale_price: vehicle.expected_sale_price || vehicle.purchase_price,
-        profit: (vehicle.expected_sale_price || vehicle.purchase_price) - vehicle.purchase_price
+        vehicle_make: (vehicle.make || '').trim() || 'Unknown',
+        vehicle_model: (vehicle.model || '').trim() || 'Unknown',
+        vehicle_year: vehicle.year || new Date().getFullYear(),
+        vin: vehicle.vin || '',
+        purchase_price: vehicle.purchase_price || 0,
+        sale_price: vehicle.expected_sale_price || vehicle.purchase_price || 0,
+        profit: (vehicle.expected_sale_price || vehicle.purchase_price || 0) - (vehicle.purchase_price || 0)
       }));
     }
   };
@@ -54,28 +86,136 @@ export function AddSaleDialog() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.sale_id || !formData.vin || !formData.customer_id) {
+    // Validate required fields - check selectedVehicleId and ensure vehicle_make is populated
+    if (!selectedVehicleId || !formData.customer_id) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields.",
+        description: "Please fill in all required fields and select a vehicle.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Additional validation: ensure vehicle_make is not empty
+    if (!formData.vehicle_make || formData.vehicle_make.trim() === '') {
+      toast({
+        title: "Error",
+        description: "The selected vehicle does not have a valid make. Please add a vehicle with a make to the inventory first.",
         variant: "destructive"
       });
       return;
     }
 
     try {
-      // Create vehicle sale record
+      // Additional validation: ensure VIN is not empty
+      if (!formData.vin || formData.vin.trim() === '') {
+        toast({
+          title: "Error",
+          description: "The selected vehicle does not have a valid VIN. Please add a vehicle with a VIN to the inventory first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check if vehicle was already sold by checking the VIN
+      const { data: existingSale, error: checkError } = await supabase
+        .from('vehicle_sales')
+        .select('id, sale_id')
+        .eq('vin', formData.vin)
+        .limit(1);
+      
+      if (checkError) {
+        console.error('Error checking for existing sale:', checkError);
+        toast({
+          title: "Error",
+          description: "Failed to verify vehicle status. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (existingSale && existingSale.length > 0) {
+        toast({
+          title: "Error",
+          description: `This vehicle has already been sold. Sale ID: ${existingSale[0].sale_id}`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Generate unique sale_id if not provided
+      const saleId = formData.sale_id?.trim() || `SALE-${Date.now()}`;
+
+      // Check if sale_id already exists
+      const { data: existingSaleId, error: checkSaleIdError } = await supabase
+        .from('vehicle_sales')
+        .select('id, sale_id')
+        .eq('sale_id', saleId)
+        .limit(1);
+      
+      if (checkSaleIdError) {
+        console.error('Error checking for existing sale_id:', checkSaleIdError);
+        toast({
+          title: "Error",
+          description: "Failed to verify sale ID. Please try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (existingSaleId && existingSaleId.length > 0) {
+        toast({
+          title: "Error",
+          description: `A sale with this ID "${saleId}" already exists. Please use a different Sale ID.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create vehicle sale record - ensure vehicle_make has a value as fallback
+      const saleData = {
+        sale_id: saleId,
+        vehicle_make: formData.vehicle_make?.trim() || 'Unknown',
+        vehicle_model: formData.vehicle_model?.trim() || 'Unknown',
+        vehicle_year: Number(formData.vehicle_year),
+        vin: formData.vin,
+        customer_id: formData.customer_id,
+        purchase_price: Number(formData.purchase_price),
+        sale_price: Number(formData.sale_price),
+        profit: Number(formData.profit),
+        payment_status: formData.payment_status || 'pending',
+        payment_method: formData.payment_method || null,
+        sale_date: formData.sale_date || new Date().toISOString().split('T')[0],
+        notes: formData.notes || null
+      };
+      
+      console.log('Creating sale with data:', saleData);
+      
       const { error } = await supabase
         .from('vehicle_sales')
-        .insert([{
-          ...formData,
-          vehicle_year: Number(formData.vehicle_year),
-          purchase_price: Number(formData.purchase_price),
-          sale_price: Number(formData.sale_price),
-          profit: Number(formData.profit)
-        }]);
+        .insert([saleData]);
 
-      if (error) throw error;
+      if (error) {
+        // Handle duplicate key error specifically
+        if (error.code === '23505') {
+          if (error.message.includes('sale_id')) {
+            throw new Error('A sale with this ID already exists. Please use a different Sale ID.');
+          } else if (error.message.includes('vin')) {
+            throw new Error('This vehicle (VIN) has already been sold.');
+          }
+        }
+        throw error;
+      }
+
+      // Update inventory status to 'sold'
+      await supabase
+        .from('inventory')
+        .update({ 
+          status: 'sold', 
+          sale_date: saleData.sale_date,
+          actual_sale_price: saleData.sale_price
+        })
+        .eq('id', selectedVehicleId);
 
       toast({
         title: "Success",
@@ -83,6 +223,7 @@ export function AddSaleDialog() {
       });
       
       setOpen(false);
+      setSelectedVehicleId('');
       setFormData({
         sale_id: '',
         vehicle_make: '',
@@ -135,12 +276,12 @@ export function AddSaleDialog() {
             </div>
             <div>
               <Label htmlFor="vehicle">Select Vehicle *</Label>
-              <Select onValueChange={handleVehicleSelect}>
+              <Select value={selectedVehicleId} onValueChange={handleVehicleSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose available vehicle" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableVehicles.map((vehicle) => (
+                  {eligibleVehicles.map((vehicle) => (
                     <SelectItem key={vehicle.id} value={vehicle.id}>
                       {vehicle.year} {vehicle.make} {vehicle.model} - {vehicle.vin}
                     </SelectItem>
@@ -313,7 +454,7 @@ export function AddSaleDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={!selectedVehicleId || !formData.customer_id}>
               Record Sale
             </Button>
           </div>

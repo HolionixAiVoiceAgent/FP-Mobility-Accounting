@@ -31,20 +31,19 @@ export function useFinancialMetrics() {
       // Calculate date range for last 12 months
       const startDate = new Date(now);
       startDate.setMonth(startDate.getMonth() - 12);
-      const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
-      const endOfMonth = new Date(currentYear, currentMonth, 0);
+      const startDateStr = startDate.toISOString().split('T')[0];
 
       // Fetch sales data with proper date filtering
       const { data: sales, error: salesError } = await supabase
         .from('vehicle_sales')
         .select('sale_price, sale_date')
-        .gte('sale_date', startDate.toISOString());
+        .gte('sale_date', startDateStr);
 
       // Fetch expenses data with proper date column (NOT created_at)
       const { data: expenses, error: expensesError } = await supabase
         .from('expenses')
         .select('amount, date')
-        .gte('date', startDate.toISOString());
+        .gte('date', startDateStr);
 
       if (salesError || expensesError) throw salesError || expensesError;
 
@@ -121,8 +120,7 @@ export function useFinancialMetrics() {
         average_monthly_profit: avgProfit,
       } as FinancialMetricsData;
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000,
   });
 
   // Set up real-time subscriptions
