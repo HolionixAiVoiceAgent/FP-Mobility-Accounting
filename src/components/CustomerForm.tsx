@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 import { Customer } from '@/hooks/useCustomers';
+import { useToast } from '@/hooks/use-toast';
 
 interface CustomerFormProps {
   onSubmit: (customer: Omit<Customer, 'id' | 'customer_id'>) => Promise<any>;
@@ -13,6 +14,8 @@ interface CustomerFormProps {
 
 export function CustomerForm({ onSubmit }: CustomerFormProps) {
   const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     type: 'individual' as 'individual' | 'business',
     name: '',
@@ -29,8 +32,13 @@ export function CustomerForm({ onSubmit }: CustomerFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await onSubmit(formData);
+      toast({
+        title: "Success",
+        description: "Customer added successfully",
+      });
       setOpen(false);
       setFormData({
         type: 'individual',
@@ -45,8 +53,15 @@ export function CustomerForm({ onSubmit }: CustomerFormProps) {
         customer_since: new Date().toISOString().split('T')[0],
         last_purchase: undefined
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to add customer:', error);
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to add customer. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -166,10 +181,12 @@ export function CustomerForm({ onSubmit }: CustomerFormProps) {
           </div>
 
           <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit">Add Customer</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding...' : 'Add Customer'}
+            </Button>
           </div>
         </form>
       </DialogContent>

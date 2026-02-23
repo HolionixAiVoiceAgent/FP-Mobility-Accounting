@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Car, 
   Plus, 
@@ -31,10 +32,11 @@ import { BulkDeleteDialog } from '@/components/BulkDeleteDialog';
 import { VehicleImageGallery } from '@/components/VehicleImageGallery';
 import { VehicleImagesDialog } from '@/components/VehicleImagesDialog';
 import { QuotationDialog } from '@/components/QuotationDialog';
-import { exportInventoryToCSV } from '@/utils/exportUtils';
+import { exportInventoryToExcel } from '@/utils/exportUtils';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Inventory() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -42,6 +44,16 @@ export default function Inventory() {
   const { data: inventory = [], isLoading, error } = useInventory();
   const { data: inventoryStats } = useInventoryStats();
   const { toast } = useToast();
+
+  // Function to refresh data without page reload
+  const handleRefreshData = () => {
+    queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+    toast({
+      title: "Refreshing",
+      description: "Inventory data is being refreshed...",
+    });
+  };
 
   const handleExportInventory = () => {
     if (inventory.length === 0) {
@@ -52,10 +64,10 @@ export default function Inventory() {
       });
       return;
     }
-    exportInventoryToCSV(inventory);
+    exportInventoryToExcel(inventory);
     toast({
       title: "Export Successful",
-      description: "Inventory data has been exported to CSV.",
+      description: "Inventory data has been exported to Excel.",
     });
   };
 
@@ -152,8 +164,8 @@ export default function Inventory() {
             <p className="text-muted-foreground">Manage vehicle stock and track availability</p>
           </div>
           <div className="flex items-center space-x-3">
-            <BulkDeleteDialog type="inventory" onDeleteComplete={() => window.location.reload()} />
-            <ImportDialog type="inventory" onImportComplete={() => window.location.reload()} />
+            <BulkDeleteDialog type="inventory" onDeleteComplete={handleRefreshData} />
+            <ImportDialog type="inventory" onImportComplete={handleRefreshData} />
             <Button variant="outline" onClick={handleExportInventory}>
               <Download className="h-4 w-4 mr-2" />
               Export Inventory
@@ -261,6 +273,16 @@ export default function Inventory() {
             <div className="space-y-4">
               {filteredInventory.map((vehicle) => {
                 const daysInStock = calculateDaysInStock(vehicle.purchase_date, vehicle.sale_date);
+                console.log('Rendering vehicle:', { 
+                  id: vehicle.id, 
+                  inventory_id: vehicle.inventory_id,
+                  purchase_date: vehicle.purchase_date,
+                  sale_date: vehicle.sale_date,
+                  daysInStock,
+                  tuv_expiry: vehicle.tuv_expiry,
+                  last_service_date: vehicle.last_service_date,
+                  images_count: vehicle.images_count
+                });
                 return (
                   <div key={vehicle.id} className="border border-border rounded-lg p-6 hover:bg-accent transition-colors">
                     <div className="flex items-center justify-between mb-4">
@@ -322,18 +344,18 @@ export default function Inventory() {
                         id={vehicle.id} 
                         table="inventory" 
                         itemName={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                        onDeleteComplete={() => window.location.reload()}
+                        onDeleteComplete={handleRefreshData}
                       />
                       <EditVehicleDialog vehicle={vehicle} />
                       <Button variant="outline" size="sm" onClick={() => {
-                        setSelectedVehicle(vehicle.id);
+                        setSelectedVehicle(vehicle.inventory_id);
                         setGalleryOpen(true);
                       }}>
                         <Eye className="h-4 w-4 mr-2" />
                         View Photos
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => {
-                        setSelectedVehicle(vehicle.id);
+                        setSelectedVehicle(vehicle.inventory_id);
                         setImagesDialogOpen(true);
                       }}>
                         <Upload className="h-4 w-4 mr-2" />
@@ -341,9 +363,12 @@ export default function Inventory() {
                       </Button>
                       <QuotationDialog vehicle={vehicle} />
                       <Button variant="outline" size="sm" onClick={() => {
+                        // Open vehicle in new tab for listing or generate listing URL
+                        const listingUrl = `${window.location.origin}/inventory/${vehicle.inventory_id}`;
+                        navigator.clipboard.writeText(listingUrl);
                         toast({
-                          title: "Feature Coming Soon",
-                          description: "Online listing creation will be available soon.",
+                          title: "Listing Link Copied",
+                          description: "Share this link to publish the vehicle listing.",
                         });
                       }}>
                         <Globe className="h-4 w-4 mr-2" />
@@ -368,7 +393,7 @@ export default function Inventory() {
           />
           <VehicleImagesDialog
             inventoryId={selectedVehicle}
-            vehicleName={inventory.find(v => v.id === selectedVehicle)?.make + ' ' + inventory.find(v => v.id === selectedVehicle)?.model || 'Vehicle'}
+            vehicleName={inventory.find(v => v.inventory_id === selectedVehicle)?.make + ' ' + inventory.find(v => v.inventory_id === selectedVehicle)?.model || 'Vehicle'}
             open={imagesDialogOpen}
             onOpenChange={setImagesDialogOpen}
           />

@@ -28,27 +28,31 @@ export function useFinancialMetrics() {
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth() + 1;
 
-      // Fetch sales and expenses for last 12 months
+      // Calculate date range for last 12 months
       const startDate = new Date(now);
       startDate.setMonth(startDate.getMonth() - 12);
+      const startDateStr = startDate.toISOString().split('T')[0];
 
+      // Fetch sales data with proper date filtering
       const { data: sales, error: salesError } = await supabase
         .from('vehicle_sales')
-        .select('sale_price, created_at')
-        .gte('created_at', startDate.toISOString());
+        .select('sale_price, sale_date')
+        .gte('sale_date', startDateStr);
 
+      // Fetch expenses data with proper date column (NOT created_at)
       const { data: expenses, error: expensesError } = await supabase
         .from('expenses')
-        .select('amount, created_at')
-        .gte('created_at', startDate.toISOString());
+        .select('amount, date')
+        .gte('date', startDateStr);
 
       if (salesError || expensesError) throw salesError || expensesError;
 
-      // Group by month
+      // Group by month using proper date fields
       const monthlyData: Record<string, MonthlyMetrics> = {};
 
+      // Process sales by sale_date
       sales?.forEach((sale: any) => {
-        const date = new Date(sale.created_at);
+        const date = new Date(sale.sale_date);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         if (!monthlyData[monthKey]) {
           monthlyData[monthKey] = {
@@ -62,8 +66,9 @@ export function useFinancialMetrics() {
         monthlyData[monthKey].revenue += sale.sale_price || 0;
       });
 
+      // Process expenses by date column (not created_at)
       expenses?.forEach((expense: any) => {
-        const date = new Date(expense.created_at);
+        const date = new Date(expense.date);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         if (!monthlyData[monthKey]) {
           monthlyData[monthKey] = {
@@ -77,7 +82,7 @@ export function useFinancialMetrics() {
         monthlyData[monthKey].expenses += expense.amount || 0;
       });
 
-      // Calculate net profit and margin
+      // Calculate net profit and margin for each month
       Object.values(monthlyData).forEach(month => {
         month.net_profit = month.revenue - month.expenses;
         month.margin = month.revenue > 0 ? (month.net_profit / month.revenue) * 100 : 0;
@@ -115,24 +120,34 @@ export function useFinancialMetrics() {
         average_monthly_profit: avgProfit,
       } as FinancialMetricsData;
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000,
   });
 
   // Set up real-time subscriptions
   useEffect(() => {
-    const salesSubscription = supabase
-      .channel('financial_sales_updates')
+    const createdSalesSubscription = supabase
+      .channel('financial_sales_created_updates')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'vehicle_sales' },
+        { event: 'INSERT', schema: 'public', table: 'vehicle_sales' },
         () => {
           query.refetch();
         }
       )
       .subscribe();
 
-    subscriptionsRef.current.push(salesSubscription);
+    const updatedSalesSubscription = supabase
+      .channel('financial_sales_updated_updates')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'vehicle_sales' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    subscriptionsRef.current.push(createdSalesSubscription, updatedSalesSubscription);
 
     const expensesSubscription = supabase
       .channel('financial_expenses_updates')
@@ -149,7 +164,9 @@ export function useFinancialMetrics() {
 
     return () => {
       subscriptionsRef.current.forEach(subscription => {
-        supabase.removeChannel(subscription);
+        if (subscription) {
+          supabase.removeChannel(subscription);
+        }
       });
       subscriptionsRef.current = [];
     };
@@ -157,3 +174,4 @@ export function useFinancialMetrics() {
 
   return query;
 }
+

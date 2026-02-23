@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+   import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, DEMO_CREDENTIALS } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,34 +14,39 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  // Redirect to dashboard when user is logged in
   useEffect(() => {
-    if (user) {
-      navigate("/");
+    if (user && !authLoading) {
+      console.log('[Auth] User detected, navigating to dashboard');
+      navigate("/", { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    console.log('[Auth] Attempting sign in with:', email);
 
     const { error } = await signIn(email, password);
 
     if (error) {
+      console.log('[Auth] Sign in error:', error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
     } else {
+      console.log('[Auth] Sign in successful!');
       toast({
         title: "Success",
         description: "Signed in successfully!",
       });
-      navigate("/");
+      // Navigation will happen via useEffect when user state updates
     }
 
     setIsLoading(false);
@@ -69,6 +74,18 @@ export default function Auth() {
     setIsLoading(false);
   };
 
+  const fillDemoAdmin = () => {
+    setEmail(DEMO_CREDENTIALS.owner.email);
+    setPassword(DEMO_CREDENTIALS.owner.password);
+    console.log('[Auth] Filled admin demo credentials');
+  };
+
+  const fillDemoEmployee = () => {
+    setEmail(DEMO_CREDENTIALS.employee.email);
+    setPassword(DEMO_CREDENTIALS.employee.password);
+    console.log('[Auth] Filled employee demo credentials');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
@@ -80,6 +97,29 @@ export default function Auth() {
           <CardDescription>Sign in to manage your dealership</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Demo Credentials Links */}
+          <div className="mb-4 p-3 bg-muted rounded-lg">
+            <p className="text-sm font-medium mb-2">Demo Accounts (click to fill):</p>
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fillDemoAdmin}
+                className="text-xs"
+              >
+                👤 Admin Demo
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fillDemoEmployee}
+                className="text-xs"
+              >
+                👤 Employee Demo
+              </Button>
+            </div>
+          </div>
+
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -161,3 +201,4 @@ export default function Auth() {
     </div>
   );
 }
+

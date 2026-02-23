@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2 } from "lucide-react";
+import { Trash2, Lock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -17,8 +17,14 @@ export function BulkDeleteDialog({ type, onDeleteComplete }: BulkDeleteDialogPro
   const { toast } = useToast();
   const { isAdmin } = useAuth();
 
+  // Show disabled button with lock icon for non-admins instead of hiding
   if (!isAdmin) {
-    return null;
+    return (
+      <Button variant="outline" size="sm" disabled title="Only admins can delete all items">
+        <Lock className="mr-2 h-4 w-4" />
+        {type === 'all' ? 'Clear All Data' : `Delete All ${type}`}
+      </Button>
+    );
   }
 
   const handleDelete = async () => {
@@ -26,12 +32,14 @@ export function BulkDeleteDialog({ type, onDeleteComplete }: BulkDeleteDialogPro
 
     try {
       if (type === 'all') {
-        // Delete in order to respect foreign key constraints
-        await supabase.from('payments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('vehicle_sales').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        await supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        // Delete in parallel to respect foreign key constraints
+        await Promise.all([
+          supabase.from('payments').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('vehicle_sales').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+          supabase.from('customers').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        ]);
         
         toast({
           title: "Success",

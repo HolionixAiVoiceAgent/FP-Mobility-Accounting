@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,6 +17,7 @@ export interface Customer {
   status: 'active' | 'pending_payment' | 'inactive';
   customer_since: string;
   last_purchase?: string;
+  created_at?: string;
 }
 
 export interface CustomerStats {
@@ -25,61 +27,82 @@ export interface CustomerStats {
   totalOutstanding: number;
 }
 
-export function useCustomers() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [stats, setStats] = useState<CustomerStats>({
-    totalCustomers: 0,
-    activeCustomers: 0,
-    newThisMonth: 0,
-    totalOutstanding: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+export const useCustomers = () => {
   const subscriptionRef = useRef<any>(null);
-  const refetchIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchCustomers = async () => {
-    try {
+  const query = useQuery({
+    queryKey: ['customers'],
+    queryFn: async (): Promise<Customer[]> => {
+      console.log('Fetching customers...');
       const { data, error } = await supabase
         .from('customers')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-
-      setCustomers((data || []) as Customer[]);
+      if (error) {
+        console.error('Customers fetch error:', error);
+        const errorStatus = (error as any).status;
+        if (error.message?.includes('JWT') || errorStatus === 406) {
+          console.warn('Auth error - returning empty array for demo mode');
+          return [];
+        }
+        throw error;
+      }
       
-      // Calculate stats
-      const totalCustomers = data?.length || 0;
-      const activeCustomers = data?.filter(c => c.status === 'active').length || 0;
+      console.log('Customers fetched successfully:', data?.length || 0, 'items');
+      return (data || []) as Customer[];
+    },
+    staleTime: 30000, // Cache data for 30 seconds - real-time subscription will handle updates
+  });
+
+  // Calculate stats from the fetched customers
+  const stats: CustomerStats = {
+    totalCustomers: query.data?.length || 0,
+    activeCustomers: query.data?.filter(c => c.status === 'active').length || 0,
+    newThisMonth: query.data?.filter(c => {
+      const customerDate = new Date(c.customer_since);
       const thisMonth = new Date();
       thisMonth.setDate(1);
-      const newThisMonth = data?.filter(c => new Date(c.customer_since) >= thisMonth).length || 0;
-      const totalOutstanding = data?.reduce((sum, c) => sum + Number(c.outstanding_balance), 0) || 0;
-
-      setStats({
-        totalCustomers,
-        activeCustomers,
-        newThisMonth,
-        totalOutstanding
-      });
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load customers',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
+      return customerDate >= thisMonth;
+    }).length || 0,
+    totalOutstanding: query.data?.reduce((sum, c) => sum + Number(c.outstanding_balance), 0) || 0
   };
 
-  const addCustomer = async (customerData: Omit<Customer, 'id' | 'customer_id'>) => {
-    try {
+  useEffect(() => {
+    const subscription = supabase
+      .channel('customers_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'customers' },
+        () => {
+          query.refetch();
+        }
+      )
+      .subscribe();
+
+    subscriptionRef.current = subscription;
+
+    return () => {
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
+    };
+  }, [query]);
+
+  return {
+    customers: query.data || [],
+    stats,
+    loading: query.isLoading,
+    error: query.error,
+    addCustomer: async (customerData: any) => {
       // Generate customer ID
-      const customerCount = customers.length + 1;
-      const customer_id = `CUST-${customerCount.toString().padStart(3, '0')}`;
+      const { data: countData } = await supabase
+        .from('customers')
+        .select('count', { count: 'exact' });
+      
+      const customerCount = (countData?.[0]?.count || 0) + 1;
+      const customer_id = `CUST-${customerCount.toString().padStart(4, '0')}`;
 
       const { data, error } = await supabase
         .from('customers')
@@ -88,25 +111,59 @@ export function useCustomers() {
         .single();
 
       if (error) throw error;
+      return data;
+    },
+    refetch: query.refetch
+  };
+};
 
-      setCustomers(prev => [data as Customer, ...prev]);
+export const useAddCustomer = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (customerData: any) => {
+      // Generate customer ID
+      const { data: countData } = await supabase
+        .from('customers')
+        .select('count', { count: 'exact' });
+      
+      const customerCount = (countData?.[0]?.count || 0) + 1;
+      const customer_id = `CUST-${customerCount.toString().padStart(4, '0')}`;
+
+      const { data, error } = await supabase
+        .from('customers')
+        .insert([{ ...customerData, customer_id }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
         title: 'Success',
         description: 'Customer added successfully'
       });
-    } catch (error) {
-      console.error('Error adding customer:', error);
+    },
+    onError: (error: any) => {
       toast({
         title: 'Error',
-        description: 'Failed to add customer',
+        description: error.message || 'Failed to add customer',
         variant: 'destructive'
       });
       throw error;
-    }
-  };
+    },
+  });
+};
 
-  const updateCustomer = async (id: string, updates: Partial<Customer>) => {
-    try {
+export const useUpdateCustomer = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: any) => {
       const { data, error } = await supabase
         .from('customers')
         .update(updates)
@@ -115,85 +172,52 @@ export function useCustomers() {
         .single();
 
       if (error) throw error;
-
-      setCustomers(prev => prev.map(c => c.id === id ? data as Customer : c));
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
         title: 'Success',
         description: 'Customer updated successfully'
       });
-    } catch (error) {
-      console.error('Error updating customer:', error);
+    },
+    onError: (error: any) => {
       toast({
         title: 'Error',
-        description: 'Failed to update customer',
+        description: error.message || 'Failed to update customer',
         variant: 'destructive'
       });
-    }
-  };
+    },
+  });
+};
 
-  const deleteCustomer = async (id: string) => {
-    try {
+export const useDeleteCustomer = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('customers')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-
-      setCustomers(prev => prev.filter(c => c.id !== id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
       toast({
         title: 'Success',
         description: 'Customer deleted successfully'
       });
-    } catch (error) {
-      console.error('Error deleting customer:', error);
+    },
+    onError: (error: any) => {
       toast({
         title: 'Error',
-        description: 'Failed to delete customer',
+        description: error.message || 'Failed to delete customer',
         variant: 'destructive'
       });
-    }
-  };
+    },
+  });
+};
 
-  useEffect(() => {
-    fetchCustomers();
-
-    // Set up real-time subscription
-    const subscription = supabase
-      .channel('customers_updates')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'customers' },
-        () => {
-          fetchCustomers();
-        }
-      )
-      .subscribe();
-
-    subscriptionRef.current = subscription;
-
-    // Also set up polling every 5 seconds for real-time updates
-    refetchIntervalRef.current = setInterval(() => {
-      fetchCustomers();
-    }, 5000);
-
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
-      }
-      if (refetchIntervalRef.current) {
-        clearInterval(refetchIntervalRef.current);
-      }
-    };
-  }, []);
-
-  return {
-    customers,
-    stats,
-    loading,
-    addCustomer,
-    updateCustomer,
-    deleteCustomer,
-    refetch: fetchCustomers
-  };
-}

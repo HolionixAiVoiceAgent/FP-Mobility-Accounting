@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePDFExport } from '@/hooks/usePDFExport';
 
@@ -8,6 +8,7 @@ interface PDFExportButtonProps {
   startDate: Date;
   endDate: Date;
   includeCharts?: boolean;
+  defaultFormat?: 'excel' | 'xlsx';
 }
 
 export function PDFExportButton({ 
@@ -15,7 +16,8 @@ export function PDFExportButton({
   reportTitle, 
   startDate, 
   endDate,
-  includeCharts = true 
+  includeCharts = true,
+  defaultFormat = 'excel'
 }: PDFExportButtonProps) {
   const { generatePDF } = usePDFExport();
 
@@ -27,6 +29,7 @@ export function PDFExportButton({
         endDate,
         includeCharts,
         includeDetails: true,
+        format: defaultFormat || 'xlsx',
       },
       data
     );
@@ -36,10 +39,10 @@ export function PDFExportButton({
     <Button
       variant="outline"
       size="sm"
-      onClick={handleExport}
       className="gap-2"
+      onClick={handleExport}
     >
-      <Download className="h-4 w-4" />
+      <FileSpreadsheet className="h-4 w-4" />
       Export Report
     </Button>
   );

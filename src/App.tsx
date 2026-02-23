@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Inventory from "./pages/Inventory";
 import VehicleSales from "./pages/VehicleSales";
@@ -43,41 +44,43 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class">
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <NotificationProvider>
-        <NotificationCenter />
-        <NotificationStubDemo />
-        <PWAInstallPrompt />
-        <MobileMenuToggle />
-        <BrowserRouter>
-          <SearchCommandPalette />
-          <KeyboardShortcutsProvider />
-          <HelpDialog />
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-            <Route path="/sales" element={<ProtectedRoute><VehicleSales /></ProtectedRoute>} />
-            <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-            <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
-            <Route path="/bank" element={<ProtectedRoute><BankIntegration /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/obligations" element={<ProtectedRoute><FinancialObligations /></ProtectedRoute>} />
-            <Route path="/purchases" element={<ProtectedRoute><VehiclePurchases /></ProtectedRoute>} />
-            <Route path="/hrm" element={<ProtectedRoute><HRM /></ProtectedRoute>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </NotificationProvider>
-    </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class">
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <NotificationProvider>
+          <NotificationCenter />
+          <NotificationStubDemo />
+          <PWAInstallPrompt />
+          <MobileMenuToggle />
+          <BrowserRouter>
+            <SearchCommandPalette />
+            <KeyboardShortcutsProvider />
+            <HelpDialog />
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/inventory" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+              <Route path="/sales" element={<ProtectedRoute><VehicleSales /></ProtectedRoute>} />
+              <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+              <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+              <Route path="/bank" element={<ProtectedRoute><BankIntegration /></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/obligations" element={<ProtectedRoute><FinancialObligations /></ProtectedRoute>} />
+              <Route path="/purchases" element={<ProtectedRoute><VehiclePurchases /></ProtectedRoute>} />
+              <Route path="/hrm" element={<ProtectedRoute><HRM /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </NotificationProvider>
+      </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

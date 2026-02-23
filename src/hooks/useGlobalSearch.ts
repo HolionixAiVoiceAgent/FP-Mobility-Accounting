@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useDebounce } from './usePerformance';
 
 export interface SearchResult {
   id: string;
@@ -24,6 +23,7 @@ export function useGlobalSearch(): SearchState {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const performSearch = useCallback(async (query: string) => {
     // Cancel previous request if still pending
@@ -31,7 +31,7 @@ export function useGlobalSearch(): SearchState {
       abortControllerRef.current.abort();
     }
 
-    if (!query || query.trim().length < 2) {
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
       setResults([]);
       return;
     }
@@ -179,14 +179,25 @@ export function useGlobalSearch(): SearchState {
     }
   }, []);
 
-  const debouncedSearch = useDebounce(performSearch, 300);
-
   const search = useCallback((query: string) => {
-    debouncedSearch(query);
+    // Clear previous debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    // Debounce the search by 300ms
+    debounceTimeoutRef.current = setTimeout(() => {
+      performSearch(query);
+    }, 300);
+    
     return Promise.resolve();
-  }, [debouncedSearch]);
+  }, [performSearch]);
 
   const clear = useCallback(() => {
+    // Clear debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
     setResults([]);
     setError(null);
     if (abortControllerRef.current) {

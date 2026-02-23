@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { exportToCSV } from '@/utils/exportUtils';
+import { exportVehiclePurchasesToExcel } from '@/utils/exportUtils';
 
 const VehiclePurchases = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,7 +63,7 @@ const VehiclePurchases = () => {
       'Payment Terms (Days)': purchase.payment_terms_days,
     }));
 
-    exportToCSV(exportData, 'vehicle-purchases');
+    exportVehiclePurchasesToExcel(exportData);
   };
 
   const handleDelete = () => {

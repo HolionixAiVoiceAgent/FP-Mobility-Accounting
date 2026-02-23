@@ -33,8 +33,7 @@ export const useExpenses = () => {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000, // Cache data for 30 seconds - real-time subscription will handle updates
   });
 
   // Set up real-time subscription
@@ -53,7 +52,10 @@ export const useExpenses = () => {
     subscriptionRef.current = subscription;
 
     return () => {
-      supabase.removeChannel(subscription);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
   }, [query]);
 
@@ -112,8 +114,7 @@ export const useExpenseStats = () => {
         categoryBreakdown
       };
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000,
+    staleTime: 30000, // Cache data for 30 seconds - real-time subscription will handle updates
   });
 
   // Set up real-time subscription
@@ -132,7 +133,10 @@ export const useExpenseStats = () => {
     subscriptionRef.current = subscription;
 
     return () => {
-      supabase.removeChannel(subscription);
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+      }
     };
   }, [query]);
 

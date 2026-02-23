@@ -3,6 +3,7 @@ import { logError } from '@/lib/errors';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { 
   Dialog, 
   DialogContent, 
@@ -35,7 +36,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-const ROLES = ['owner', 'manager', 'sales_manager', 'salesperson', 'accountant', 'hr_manager', 'inventory_manager', 'service_advisor'];
+const ROLES = ['owner', 'employee'];
 const DEPARTMENTS = ['sales', 'finance', 'operations', 'hr', 'inventory', 'management', 'admin'];
 
 interface Employee {
@@ -69,11 +70,11 @@ interface EmployeeForm {
 export function EmployeeManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAdmin, loading: authLoading } = useAuth();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const [form, setForm] = useState<EmployeeForm>({
     first_name: '',
@@ -88,27 +89,25 @@ export function EmployeeManagement() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Check if user is admin
+  // Reset form when dialog opens for adding new employee
   useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          // Check if user has admin role in employees table or is owner
-          const { data } = await (supabase as any)
-            .from('employees')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-          
-          setIsAdmin(data?.role === 'owner' || data?.role === 'manager' || data?.role === 'hr_manager');
-        }
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-      }
-    };
-    checkAdmin();
-  }, []);
+    if (!addDialogOpen) {
+      // Dialog closed - form will be reset on next open or by handleEdit
+    } else if (!editingEmployee) {
+      // Dialog opened for adding new employee - reset form
+      setForm({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        role: 'salesperson',
+        position: '',
+        department: 'sales',
+        base_salary: '',
+        hourly_rate: '',
+      });
+    }
+  }, [addDialogOpen, editingEmployee]);
 
   // Fetch employees
   const { data: employees = [], isLoading } = useQuery({
@@ -126,12 +125,22 @@ export function EmployeeManagement() {
   });
 
   // Fetch company settings to access monthly_work_hours for hourly derivation
+  // Using 'as any' to bypass type checking since column might not exist yet
   const { data: companySettings } = useQuery({
     queryKey: ['company-settings'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('company_settings').select('monthly_work_hours').single();
-      if (error) return null;
-      return data;
+      try {
+        const { data, error } = await (supabase as any)
+          .from('company_settings')
+          .select('monthly_work_hours')
+          .single();
+        if (error || !data) return null;
+        return data;
+      } catch (e) {
+        // Table or column might not exist yet
+        console.log('[EmployeeManagement] company_settings table not available:', e);
+        return null;
+      }
     },
   });
 
@@ -412,6 +421,20 @@ export function EmployeeManagement() {
     }
   };
 
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <Card className="border-border bg-card">
+        <CardContent className="pt-6">
+          <div flex-col items-center className="flex gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="text-muted-foreground">Checking permissions...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!isAdmin) {
     return (
       <Card className="border-amber-200 bg-amber-50">
@@ -434,10 +457,7 @@ export function EmployeeManagement() {
         </div>
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => {
-              resetForm();
-              setEditingEmployee(null);
-            }}>
+            <Button>
               <Plus className="h-4 w-4 mr-2" />
               Add Employee
             </Button>

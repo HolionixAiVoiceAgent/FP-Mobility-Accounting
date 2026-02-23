@@ -1,13 +1,15 @@
 import { useRole } from '@/hooks/useRole';
 import { OwnerDashboard } from './dashboards/OwnerDashboard';
-import { SalesDashboard } from './dashboards/SalesDashboard';
-import { FinanceDashboard } from './dashboards/FinanceDashboard';
-import { HRDashboard } from './dashboards/HRDashboard';
-import { InventoryDashboard } from './dashboards/InventoryDashboard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect } from 'react';
 
 export function Dashboard() {
   const { role, loading } = useRole();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('[Dashboard] Role:', role, 'Loading:', loading);
+  }, [role, loading]);
 
   if (loading) {
     return (
@@ -24,18 +26,9 @@ export function Dashboard() {
   // Route to role-specific dashboard
   switch (role) {
     case 'owner':
-    case 'admin':
       return <OwnerDashboard />;
-    case 'sales_manager':
-      return <SalesDashboard />;
-    case 'accountant':
-      return <FinanceDashboard />;
-    case 'hr_manager':
-      return <HRDashboard />;
-    case 'inventory_manager':
-      return <InventoryDashboard />;
-    case 'salesperson':
-      return <SalesDashboard />; // Salespeople see sales dashboard
+    case 'employee':
+      return <OwnerDashboard />; // Employees also see owner dashboard
     default:
       return (
         <Card>
@@ -43,9 +36,10 @@ export function Dashboard() {
             <CardTitle>Dashboard</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">No dashboard available for your role.</p>
+            <p className="text-gray-600">Please log in to access the dashboard.</p>
           </CardContent>
         </Card>
       );
   }
 }
+

@@ -56,8 +56,7 @@ export const useDashboardData = () => {
         activeDeals: 0,
       };
     },
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
-    staleTime: 2000, // Data is stale after 2 seconds
+    staleTime: 30000,
   });
 
   // Set up real-time subscriptions for changes

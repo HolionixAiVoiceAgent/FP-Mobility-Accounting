@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInventoryStats } from '@/hooks/useInventory';
@@ -5,7 +6,7 @@ import { useVehicleSalesStats } from '@/hooks/useVehicleSales';
 import { useExpenseStats } from '@/hooks/useExpenses';
 import { useTinkBalance } from '@/hooks/useTinkBalance';
 import { useCustomers } from '@/hooks/useCustomers';
-import { useFinancialMetrics } from '@/hooks/useFinancialMetrics';
+import { useFinancialMetricsOptimized } from '@/hooks/useFinancialMetricsOptimized';
 import { useDashboardVisibility } from '@/hooks/useDashboardVisibility';
 import { Euro, TrendingUp, TrendingDown, Car, Users, AlertCircle, Lock } from 'lucide-react';
 import { format } from 'date-fns';
@@ -23,27 +24,35 @@ import { CustomerSegmentationWidget } from '../widgets/CustomerSegmentationWidge
 import { PredictiveAnalyticsWidget } from '../widgets/PredictiveAnalyticsWidget';
 
 export function OwnerDashboard() {
+  // Fetch all dashboard data
   const { data: inventoryStats, isLoading: inventoryLoading } = useInventoryStats();
   const { data: salesStats, isLoading: salesLoading } = useVehicleSalesStats();
   const { data: expenseStats, isLoading: expensesLoading } = useExpenseStats();
-  const { data: financialMetrics, isLoading: financialLoading } = useFinancialMetrics();
+  const { data: financialMetrics, isLoading: financialLoading } = useFinancialMetricsOptimized();
   const { balance: bankBalance } = useTinkBalance();
-  const { customers } = useCustomers();
+  const { customers, loading: customersLoading } = useCustomers();
   const visibility = useDashboardVisibility();
 
-  const monthlyRevenue = salesStats?.totalSales || 0;
-  const monthlyExpenses = expenseStats?.totalExpenses || 0;
+  // Debug logging
+  useEffect(() => {
+    console.log('OwnerDashboard - financialMetrics:', financialMetrics);
+    console.log('OwnerDashboard - salesData:', financialMetrics?.last_12_months);
+  }, [financialMetrics]);
+
+  // Calculate metrics from all sources
+  const monthlyRevenue = financialMetrics?.current_month?.revenue || salesStats?.totalSales || 0;
+  const monthlyExpenses = financialMetrics?.current_month?.expenses || expenseStats?.totalExpenses || 0;
   const netProfit = monthlyRevenue - monthlyExpenses;
   const activeCustomers = customers?.filter(c => c.status === 'active').length || 0;
 
-  // Prepare sales data for charts from financial metrics
-  const salesData = financialMetrics?.last_12_months?.map(month => ({
+  // Prepare sales data for charts from optimized financial metrics
+  const salesData = (financialMetrics?.last_12_months || []).map(month => ({
     month: month.month,
-    revenue: month.revenue,
-    expenses: month.expenses,
-    profit: month.net_profit,
-    vehiclesSold: 0, // This would need to be calculated from sales data
-  })) || [];
+    revenue: month.revenue || 0,
+    expenses: month.expenses || 0,
+    profit: month.net_profit || 0,
+    vehiclesSold: month.vehicles_sold || 0,
+  }));
 
   const revenueBySource = [
     { name: 'Car Sales', value: monthlyRevenue },
@@ -51,7 +60,8 @@ export function OwnerDashboard() {
     { name: 'Insurance Commissions', value: 0 },
   ];
 
-  const isLoading = inventoryLoading || salesLoading || expensesLoading || financialLoading;
+  // Combined loading state
+  const isLoading = inventoryLoading || salesLoading || expensesLoading || financialLoading || customersLoading;
 
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
@@ -86,7 +96,7 @@ export function OwnerDashboard() {
             ) : (
               <>
                 <div className="text-2xl font-bold">€{monthlyRevenue.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground mt-1">From {inventoryStats?.soldThisMonth || 0} sales</p>
+                <p className="text-xs text-muted-foreground mt-1">From {financialMetrics?.current_month?.vehicles_sold || inventoryStats?.soldThisMonth || 0} sales</p>
               </>
             )}
           </CardContent>
@@ -133,7 +143,7 @@ export function OwnerDashboard() {
             ) : (
               <>
                 <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>€{netProfit.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground mt-1">{monthlyRevenue > 0 ? ((netProfit / monthlyRevenue) * 100).toFixed(1) : 0}% margin</p>
+                <p className="text-xs text-muted-foreground mt-1">{financialMetrics?.current_month?.margin?.toFixed(1) || (monthlyRevenue > 0 ? ((netProfit / monthlyRevenue) * 100).toFixed(1) : 0)}% margin</p>
               </>
             )}
           </CardContent>
@@ -245,7 +255,7 @@ export function OwnerDashboard() {
               </>
             ) : (
               <>
-                <div className="text-2xl font-bold">{inventoryStats?.soldThisMonth || 0}</div>
+                <div className="text-2xl font-bold">{financialMetrics?.current_month?.vehicles_sold || inventoryStats?.soldThisMonth || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">Vehicles sold</p>
               </>
             )}
@@ -253,7 +263,7 @@ export function OwnerDashboard() {
         </Card>
       </div>
 
-      {/* Charts - Now with real-time data from financial metrics */}
+      {/* Charts Section - Shows real-time data from optimized financial metrics */}
       <div className="mt-4 sm:mt-8">
         {!visibility.showFinancialMetrics ? (
           <Card>
@@ -305,3 +315,4 @@ export function OwnerDashboard() {
     </div>
   );
 }
+

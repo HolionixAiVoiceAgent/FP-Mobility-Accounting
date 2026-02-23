@@ -39,10 +39,14 @@ export function useAdvancedKPIs() {
         .eq('status', 'available');
 
       // Fetch sales data
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0];
+      
       const { data: sales } = await supabase
         .from('vehicle_sales')
         .select('id, vehicle_make, profit, sale_price, purchase_price, customer_id, created_at, sale_date')
-        .gte('sale_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString());
+        .gte('sale_date', oneYearAgoStr);
 
       // Fetch customers
       const { data: customers } = await supabase
@@ -52,7 +56,10 @@ export function useAdvancedKPIs() {
       // Calculate Inventory Aging
       const now = new Date();
       const agingDays = (inventory || []).map((item: any) => {
-        const createdDate = new Date(item.created_at);
+        // Use created_at or purchase_date for aging calculation
+        const itemDate = item.created_at || item.purchase_date;
+        if (!itemDate) return 0;
+        const createdDate = new Date(itemDate);
         return Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
       });
 

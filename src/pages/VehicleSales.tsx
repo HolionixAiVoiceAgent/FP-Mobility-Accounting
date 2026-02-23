@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Car, 
   Plus, 
@@ -18,7 +19,7 @@ import {
 import { useState } from 'react';
 import { useVehicleSales, useVehicleSalesStats } from '@/hooks/useVehicleSales';
 import { AddSaleDialog } from '@/components/AddSaleDialog';
-import { exportVehicleSalesToCSV } from '@/utils/exportUtils';
+import { exportVehicleSalesToExcel } from '@/utils/exportUtils';
 import { useToast } from '@/hooks/use-toast';
 import { CustomerDetailsDialog } from '@/components/CustomerDetailsDialog';
 import { ImportDialog } from '@/components/ImportDialog';
@@ -28,10 +29,16 @@ import { generateInvoicePDF } from '@/utils/pdfGenerator';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function VehicleSales() {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const { data: vehicleSales = [], isLoading, error } = useVehicleSales();
   const { data: salesStats } = useVehicleSalesStats();
   const { toast } = useToast();
+
+  // Function to refresh data without page reload
+  const handleRefreshData = () => {
+    queryClient.invalidateQueries({ queryKey: ['vehicle-sales'] });
+  };
 
   const handleExportSales = () => {
     if (vehicleSales.length === 0) {
@@ -42,10 +49,10 @@ export default function VehicleSales() {
       });
       return;
     }
-    exportVehicleSalesToCSV(vehicleSales);
+    exportVehicleSalesToExcel(vehicleSales);
     toast({
       title: "Export Successful",
-      description: "Sales data has been exported to CSV.",
+      description: "Sales data has been exported to Excel.",
     });
   };
 
@@ -106,8 +113,8 @@ export default function VehicleSales() {
             <p className="text-muted-foreground">Manage vehicle inventory and customer sales</p>
           </div>
           <div className="flex items-center space-x-3">
-            <BulkDeleteDialog type="sales" onDeleteComplete={() => window.location.reload()} />
-            <ImportDialog type="sales" onImportComplete={() => window.location.reload()} />
+            <BulkDeleteDialog type="sales" onDeleteComplete={handleRefreshData} />
+            <ImportDialog type="sales" onImportComplete={handleRefreshData} />
             <Button variant="outline" onClick={handleExportSales}>
               <Download className="h-4 w-4 mr-2" />
               Export Sales
@@ -238,7 +245,7 @@ export default function VehicleSales() {
                         id={sale.id} 
                         table="vehicle_sales" 
                         itemName={`Sale #${sale.sale_id}`}
-                        onDeleteComplete={() => window.location.reload()}
+                        onDeleteComplete={handleRefreshData}
                       />
                       <Button variant="outline" size="sm" onClick={async () => {
                         try {

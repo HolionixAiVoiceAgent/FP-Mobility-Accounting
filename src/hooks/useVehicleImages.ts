@@ -25,10 +25,15 @@ export const useVehicleImages = (inventoryId: string | undefined) => {
         .eq('inventory_id', inventoryId)
         .order('image_order', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching vehicle images:', error);
+        // If table doesn't exist or other error, return empty array
+        return [];
+      }
       return data || [];
     },
     enabled: !!inventoryId,
+    retry: 1,
   });
 };
 
@@ -82,6 +87,19 @@ export const useUploadVehicleImage = () => {
 
       if (dbError) throw dbError;
 
+      // Update images_count in inventory table - count actual images
+      const { data: currentImages } = await supabase
+        .from('vehicle_images')
+        .select('id', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId);
+
+      const imageCount = currentImages?.length || 0;
+
+      await supabase
+        .from('inventory')
+        .update({ images_count: imageCount })
+        .eq('inventory_id', inventoryId);
+
       return publicUrl;
     },
     onSuccess: (_, variables) => {
@@ -121,6 +139,19 @@ export const useDeleteVehicleImage = () => {
         .eq('id', id);
 
       if (error) throw error;
+
+      // Update images_count in inventory table - count actual images
+      const { data: currentImages } = await supabase
+        .from('vehicle_images')
+        .select('id', { count: 'exact', head: true })
+        .eq('inventory_id', inventoryId);
+
+      const imageCount = currentImages?.length || 0;
+
+      await supabase
+        .from('inventory')
+        .update({ images_count: imageCount })
+        .eq('inventory_id', inventoryId);
       
       return inventoryId;
     },

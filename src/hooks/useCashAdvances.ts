@@ -23,8 +23,7 @@ export const useCashAdvances = () => {
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 5000,
-    staleTime: 2000,
+    staleTime: 30000,
   });
 
   const create = useMutation({

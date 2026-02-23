@@ -49,17 +49,27 @@ export function AddVehicleDialog() {
     }
 
     try {
-      await createMutation.mutateAsync({
-        ...formData,
+      const result = await createMutation.mutateAsync({
+        inventory_id: formData.inventory_id || null,
+        vin: formData.vin,
+        make: formData.make,
+        model: formData.model,
         year: Number(formData.year),
-        mileage: formData.mileage || undefined,
+        color: formData.color || null,
+        mileage: formData.mileage || null,
         purchase_price: Number(formData.purchase_price),
-        expected_sale_price: formData.expected_sale_price || undefined,
-        tuv_expiry: formData.tuv_expiry || undefined,
-        last_service_date: formData.last_service_date || undefined,
-        images_count: 0
+        expected_sale_price: formData.expected_sale_price || null,
+        status: formData.status,
+        location: formData.location || null,
+        tuv_expiry: formData.tuv_expiry || null,
+        last_service_date: formData.last_service_date || null,
+        purchase_date: formData.purchase_date,
+        sale_date: null,
+        images_count: null,
+        notes: formData.notes || null
       });
       
+      console.log('Vehicle added result:', result);
       setOpen(false);
       setFormData({
         inventory_id: '',
@@ -78,8 +88,13 @@ export function AddVehicleDialog() {
         purchase_date: new Date().toISOString().split('T')[0],
         notes: ''
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding vehicle:', error);
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to add vehicle. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

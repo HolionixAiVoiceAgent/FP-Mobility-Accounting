@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { logError, ValidationError, DatabaseError } from '@/lib/errors';
 import { EmployeeManagement } from '@/components/EmployeeManagement';
@@ -79,7 +80,7 @@ const LEAVE_TYPES = ['sick', 'vacation', 'personal', 'unpaid'];
 export default function HRM() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { isAdmin, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('employees');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
@@ -104,27 +105,6 @@ export default function HRM() {
     base_salary: '',
     commission_rate: '0',
   });
-
-  // Check admin status
-  useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data } = await (supabase as any)
-            .from('employees')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-
-          setIsAdmin(data?.role === 'owner' || data?.role === 'manager' || data?.role === 'hr_manager');
-        }
-      } catch (error) {
-        console.error('Error checking admin status:', error);
-      }
-    };
-    checkAdmin();
-  }, []);
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
@@ -429,6 +409,24 @@ export default function HRM() {
       console.error('Edit attendance error:', error);
     },
   });
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="border-border bg-card max-w-md">
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center gap-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <p className="text-muted-foreground">Checking permissions...</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!isAdmin) {
     return (

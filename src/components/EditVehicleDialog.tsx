@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import QrReader from 'react-qr-barcode-scanner';
 import { VehicleImageUpload } from './VehicleImageUpload';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,20 +71,36 @@ export function EditVehicleDialog({ vehicle }: EditVehicleDialogProps) {
     try {
       await updateMutation.mutateAsync({
         id: vehicle.id,
-        ...formData,
+        inventory_id: formData.inventory_id,
+        vin: formData.vin,
+        make: formData.make,
+        model: formData.model,
         year: Number(formData.year),
-        mileage: formData.mileage || undefined,
+        color: formData.color || null,
+        mileage: formData.mileage || null,
         purchase_price: Number(formData.purchase_price),
-        expected_sale_price: formData.expected_sale_price || undefined,
-        actual_sale_price: formData.actual_sale_price || undefined,
-        tuv_expiry: formData.tuv_expiry || undefined,
-        last_service_date: formData.last_service_date || undefined,
-        sale_date: formData.sale_date || undefined
+        expected_sale_price: formData.expected_sale_price || null,
+        actual_sale_price: formData.actual_sale_price || null,
+        status: formData.status,
+        location: formData.location || null,
+        tuv_expiry: formData.tuv_expiry || null,
+        last_service_date: formData.last_service_date || null,
+        purchase_date: formData.purchase_date,
+        sale_date: formData.sale_date || null,
+        notes: formData.notes || null
       });
       
-      setOpen(false);
+      // Toast is handled by the hook, close dialog after a short delay to allow toast to show
+      setTimeout(() => {
+        setOpen(false);
+      }, 500);
     } catch (error) {
       console.error('Error updating vehicle:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update vehicle. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -96,9 +112,12 @@ export function EditVehicleDialog({ vehicle }: EditVehicleDialogProps) {
           Edit Details
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="edit-vehicle-description">
         <DialogHeader>
           <DialogTitle>Edit Vehicle Details</DialogTitle>
+          <DialogDescription id="edit-vehicle-description">
+            Update the vehicle details including VIN, make, model, year, mileage, and pricing information.
+          </DialogDescription>
         </DialogHeader>
 
         {/* VIN Scanner Modal */}

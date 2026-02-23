@@ -1,3 +1,39 @@
+import * as XLSX from 'xlsx';
+
+export const generateExpenseExcelTemplate = () => {
+  const templateData = [
+    {
+      date: "2024-03-15",
+      amount: "150.50",
+      description: "Office supplies",
+      category: "Office Supplies",
+      vendor: "Office Depot",
+      tax_deductible: "true"
+    },
+    {
+      date: "2024-03-16",
+      amount: "2500.00",
+      description: "Monthly rent",
+      category: "Office Rent",
+      vendor: "Property Management Co",
+      tax_deductible: "true"
+    },
+    {
+      date: "2024-03-17",
+      amount: "89.99",
+      description: "Fuel for company vehicle",
+      category: "Fuel",
+      vendor: "Shell",
+      tax_deductible: "true"
+    }
+  ];
+
+  const worksheet = XLSX.utils.json_to_sheet(templateData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Expenses Template");
+  XLSX.writeFile(workbook, 'expense_template.xlsx');
+};
+
 export const generateExpenseCSVTemplate = () => {
   const headers = ['date', 'amount', 'description', 'category', 'vendor', 'tax_deductible'];
   const sampleData = [
